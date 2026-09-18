@@ -1,0 +1,1988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CSC Performance Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap">
+<style>
+:root{
+  --bg:#FFFBEF;
+  --surface:#FFFFFF;
+  --surface-alt:#FBF3DC;
+  --border:#F0E1B0;
+  --ink:#2E2410;
+  --ink-soft:#7A6B3E;
+  --ink-faint:#AFA06A;
+  --accent:#E8A93D;
+  --accent-ink:#2E2103;
+  --accent-soft:#FCEFC7;
+  --accent-soft-ink:#8A5F06;
+  --gold:#B4761E;
+  --gold-soft:#F5E3C3;
+  --brown:#8A5A2E;
+  --brown-soft:#EFE0C2;
+  --success:#26875A;
+  --success-soft:#DEF3E7;
+  --warning:#C2570C;
+  --warning-soft:#FCE7CE;
+  --danger:#C13B3B;
+  --danger-soft:#FBE2E0;
+  --chip-personal-bg:#FBE1E9;
+  --chip-personal-ink:#9C3D66;
+  --chip-team-bg:#DCEAE3;
+  --chip-team-ink:#2C6B4F;
+  --shadow: 0 1px 2px rgba(46,36,16,.05), 0 8px 24px -12px rgba(46,36,16,.20);
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#211B0A;
+    --surface:#2C2410;
+    --surface-alt:#332A14;
+    --border:#453B1E;
+    --ink:#F5EFDD;
+    --ink-soft:#C9BD97;
+    --ink-faint:#948761;
+    --accent:#F0B429;
+    --accent-ink:#241800;
+    --accent-soft:#3A2F12;
+    --accent-soft-ink:#F5C863;
+    --gold:#D89B3C;
+    --gold-soft:#3A2E14;
+    --brown:#C99566;
+    --brown-soft:#392C1A;
+    --success:#4FC98A;
+    --success-soft:#1D3327;
+    --warning:#E08A3C;
+    --warning-soft:#3A2A14;
+    --danger:#F2776A;
+    --danger-soft:#3A211F;
+    --chip-personal-bg:#3A2230;
+    --chip-personal-ink:#F0A8C8;
+    --chip-team-bg:#1E3328;
+    --chip-team-ink:#7FCBA5;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#211B0A;
+  --surface:#2C2410;
+  --surface-alt:#332A14;
+  --border:#453B1E;
+  --ink:#F5EFDD;
+  --ink-soft:#C9BD97;
+  --ink-faint:#948761;
+  --accent:#F0B429;
+  --accent-ink:#241800;
+  --accent-soft:#3A2F12;
+  --accent-soft-ink:#F5C863;
+  --gold:#D89B3C;
+  --gold-soft:#3A2E14;
+  --brown:#C99566;
+  --brown-soft:#392C1A;
+  --success:#4FC98A;
+  --success-soft:#1D3327;
+  --warning:#E08A3C;
+  --warning-soft:#3A2A14;
+  --danger:#F2776A;
+  --danger-soft:#3A211F;
+  --chip-personal-bg:#3A2230;
+  --chip-personal-ink:#F0A8C8;
+  --chip-team-bg:#1E3328;
+  --chip-team-ink:#7FCBA5;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box;}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:'Inter',system-ui,sans-serif;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+}
+h1,h2,h3,.display{font-family:'Baloo 2',sans-serif; text-wrap:balance;}
+button{font-family:inherit;}
+input,select{font-family:inherit;}
+::selection{background:var(--accent-soft);}
+.app{max-width:1180px;margin:0 auto;padding-bottom:64px;}
+
+/* ---- topbar ---- */
+.topbar{
+  position:sticky; top:env(safe-area-inset-top,0px); z-index:40;
+  background:var(--bg); padding-top:16px; padding-bottom:10px;
+  border-bottom:1px solid var(--border);
+  margin-bottom:20px;
+}
+.topbar-row{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand-mark{
+  width:38px;height:38px;border-radius:12px;
+  background:linear-gradient(145deg,var(--accent),var(--accent-soft-ink));
+  display:flex;align-items:center;justify-content:center;
+  color:var(--accent-ink); font-family:'Baloo 2',sans-serif; font-weight:700; font-size:18px;
+  flex-shrink:0;
+}
+.brand-text .t1{font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); font-weight:700;}
+.brand-text .t2{font-family:'Baloo 2',sans-serif; font-weight:600; font-size:17px; line-height:1.1;}
+.who{display:flex; align-items:center; gap:10px; font-size:13px; color:var(--ink-soft);}
+.who b{color:var(--ink);}
+.btn-ghost{
+  border:1px solid var(--border); background:var(--surface); color:var(--ink);
+  padding:7px 12px; border-radius:999px; font-size:12.5px; font-weight:600; cursor:pointer;
+}
+.btn-ghost:hover{border-color:var(--accent);}
+.nav{display:flex; gap:4px; overflow-x:auto; padding-top:12px; margin:0 -2px; scrollbar-width:none;}
+.nav::-webkit-scrollbar{display:none;}
+.navlink{
+  flex:0 0 auto; display:flex; align-items:center; gap:6px;
+  padding:8px 14px; border-radius:999px; font-size:13px; font-weight:700;
+  color:var(--ink-soft); cursor:pointer; border:1px solid transparent; white-space:nowrap;
+}
+.navlink.active{background:var(--accent); color:var(--accent-ink);}
+.navlink:not(.active):hover{background:var(--surface-alt); color:var(--ink);}
+.navlink.admin{color:var(--gold);}
+.navlink.admin.active{background:var(--gold); color:#2b2005;}
+
+/* ---- layout helpers ---- */
+.grid{display:grid; gap:14px;}
+.cols-2{grid-template-columns:1fr 1fr;}
+.cols-3{grid-template-columns:repeat(3,1fr);}
+.cols-4{grid-template-columns:repeat(4,1fr);}
+@media (max-width:860px){ .cols-3{grid-template-columns:1fr 1fr;} .cols-4{grid-template-columns:1fr 1fr;} }
+@media (max-width:560px){ .cols-2,.cols-3,.cols-4{grid-template-columns:1fr;} }
+.stack{display:flex; flex-direction:column; gap:14px;}
+.row{display:flex; align-items:center; gap:10px;}
+.row.wrap{flex-wrap:wrap;}
+.spread{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+
+/* ---- cards ---- */
+.card{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg);
+  padding:18px; box-shadow:var(--shadow);
+}
+.card.pad-sm{padding:14px;}
+.card-title{font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); font-weight:800; margin:0 0 10px;}
+.section-title{font-family:'Baloo 2',sans-serif; font-weight:600; font-size:20px; margin:0 0 4px;}
+.section-sub{color:var(--ink-soft); font-size:13px; margin:0 0 16px;}
+
+/* ---- stat tile ---- */
+.stat-tile{
+  border-radius:var(--radius-md); padding:14px 16px; background:var(--surface-alt);
+  display:flex; flex-direction:column; gap:6px; min-width:0;
+}
+.stat-tile .label{font-size:11.5px; color:var(--ink-soft); font-weight:700; text-transform:uppercase; letter-spacing:.05em; display:flex; align-items:center; gap:5px;}
+.stat-tile .value{font-family:'Baloo 2',sans-serif; font-weight:700; font-size:26px; font-variant-numeric:tabular-nums; line-height:1.1;}
+.stat-tile .sub{font-size:12px; color:var(--ink-soft); font-variant-numeric:tabular-nums;}
+.stat-tile.hero{background:linear-gradient(160deg,var(--accent-soft),var(--surface-alt));}
+.pill{
+  display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:999px;
+  font-size:11.5px; font-weight:800; letter-spacing:.02em; white-space:nowrap;
+}
+.pill.success{background:var(--success-soft); color:var(--success);}
+.pill.warning{background:var(--warning-soft); color:var(--warning);}
+.pill.danger{background:var(--danger-soft); color:var(--danger);}
+.pill.neutral{background:var(--surface-alt); color:var(--ink-soft); border:1px solid var(--border);}
+
+/* ---- progress ---- */
+.progress-track{height:10px; border-radius:999px; background:var(--surface-alt); overflow:hidden; border:1px solid var(--border);}
+.progress-fill{height:100%; border-radius:999px; background:var(--accent); transition:width .4s ease;}
+.progress-fill.success{background:var(--success);}
+.progress-fill.warning{background:var(--warning);}
+
+/* ---- profile card (team overview) ---- */
+.profile-card{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg);
+  padding:16px; box-shadow:var(--shadow); cursor:pointer; display:flex; flex-direction:column; gap:12px;
+  transition:transform .12s ease, border-color .12s ease;
+}
+.profile-card:hover{transform:translateY(-2px); border-color:var(--accent);}
+.avatar{
+  width:52px; height:52px; border-radius:16px; flex-shrink:0; object-fit:cover;
+  display:flex; align-items:center; justify-content:center; font-family:'Baloo 2',sans-serif; font-weight:700; font-size:19px;
+  color:#fff;
+}
+.avatar.lg{width:76px;height:76px;border-radius:22px;font-size:26px;}
+.badges{display:flex; flex-wrap:wrap; gap:2px 6px; font-size:15px; line-height:1.4;}
+.badges .empty{font-size:11.5px; color:var(--ink-faint); font-style:italic;}
+.mini-stat{font-size:11.5px; color:var(--ink-soft); font-weight:700; text-transform:uppercase; letter-spacing:.04em;}
+.mini-val{font-variant-numeric:tabular-nums; font-weight:700; color:var(--ink);}
+
+/* ---- calendar ---- */
+.cal-head{display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:6px;}
+.cal-head span{text-align:center; font-size:11px; font-weight:800; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.05em;}
+.cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:6px;}
+.day-cell{
+  border-radius:12px; border:1px solid var(--border); background:var(--surface-alt);
+  padding:6px; display:flex; flex-direction:column; align-items:stretch; cursor:pointer;
+  min-height:80px; gap:1px; overflow:hidden;
+}
+.day-cell.outmonth{opacity:.35; cursor:default;}
+.day-cell.today{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft) inset;}
+.day-cell .dnum{font-size:12px; font-weight:800; font-variant-numeric:tabular-nums;}
+.day-cell .dinfo{font-size:10.5px; line-height:1.35; font-variant-numeric:tabular-nums;}
+.day-cell.ach{background:var(--success-soft);}
+.day-cell.mid{background:var(--warning-soft);}
+.day-cell.low{background:var(--danger-soft);}
+.day-chips{display:flex; flex-direction:column; gap:2px; margin-top:2px;}
+.day-chip{
+  font-size:9.5px; line-height:1.3; padding:1.5px 5px; border-radius:6px; font-weight:700;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;
+}
+.day-chip.personal{background:var(--chip-personal-bg); color:var(--chip-personal-ink);}
+.day-chip.team{background:var(--chip-team-bg); color:var(--chip-team-ink);}
+.day-chip.more{background:transparent; color:var(--ink-faint); font-weight:800; padding:0 2px;}
+@media (max-width:560px){
+  .day-cell{min-height:54px;}
+  .day-cell .dinfo{display:none;}
+  .day-chip{font-size:8.5px; padding:1px 3px;}
+  .day-chip:nth-child(n+2){display:none;}
+}
+
+/* ---- table ---- */
+.table-wrap{overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius-md);}
+table{border-collapse:collapse; width:100%; min-width:640px; font-size:13.5px;}
+th,td{padding:10px 12px; text-align:left; border-bottom:1px solid var(--border); vertical-align:middle;}
+th{font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-faint); background:var(--surface-alt); font-weight:800;}
+tr:last-child td{border-bottom:none;}
+tr.row-clickable{cursor:pointer;}
+tr.row-clickable:hover td{background:var(--surface-alt);}
+input.cell-input{width:76px; padding:6px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--ink); font-variant-numeric:tabular-nums;}
+input.cell-input:focus{outline:2px solid var(--accent); outline-offset:1px;}
+
+/* ---- form ---- */
+.field{display:flex; flex-direction:column; gap:5px;}
+.field label{font-size:12px; font-weight:700; color:var(--ink-soft);}
+.field input,.field select{
+  padding:9px 12px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--ink); font-size:14px;
+}
+.field input:focus,.field select:focus{outline:2px solid var(--accent); outline-offset:1px;}
+.btn{
+  padding:10px 18px; border-radius:12px; border:none; background:var(--accent); color:var(--accent-ink);
+  font-weight:800; font-size:13.5px; cursor:pointer;
+}
+.btn:hover{filter:brightness(1.06);}
+.btn:disabled{opacity:.5; cursor:not-allowed;}
+.btn.secondary{background:var(--surface-alt); color:var(--ink); border:1px solid var(--border);}
+.btn.danger{background:var(--danger); color:#fff;}
+.btn.sm{padding:7px 12px; font-size:12.5px; border-radius:10px;}
+.iconbtn{
+  width:30px;height:30px;border-radius:9px;border:1px solid var(--border);background:var(--surface);
+  display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-weight:800;color:var(--ink);
+}
+.iconbtn:hover{border-color:var(--accent);}
+
+/* ---- modal ---- */
+.overlay{position:fixed; inset:0; background:rgba(20,15,22,.5); display:flex; align-items:center; justify-content:center; z-index:100; padding:20px;}
+.modal{background:var(--surface); border-radius:var(--radius-lg); max-width:440px; width:100%; padding:22px; box-shadow:var(--shadow); max-height:86vh; overflow-y:auto;}
+.modal h3{margin:0 0 4px;}
+.modal .close{position:absolute; top:14px; right:14px;}
+
+/* ---- role screen ---- */
+.role-wrap{min-height:70vh; display:flex; align-items:center; justify-content:center; padding:24px 0;}
+.role-card{max-width:480px; width:100%; text-align:center;}
+.role-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:18px;}
+@media (max-width:480px){ .role-grid{grid-template-columns:1fr;} }
+.role-opt{
+  border:1px solid var(--border); border-radius:var(--radius-md); padding:18px 12px; background:var(--surface);
+  cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:8px; font-weight:700;
+}
+.role-opt:hover{border-color:var(--accent); background:var(--accent-soft);}
+.role-opt .ic{font-size:26px;}
+
+/* ---- achievements ---- */
+.ach-row{display:flex; align-items:center; gap:16px; flex-wrap:wrap;}
+.ach-box{display:flex; align-items:center; gap:10px; background:var(--surface-alt); padding:10px 14px; border-radius:14px;}
+.ach-box .emo{font-size:22px;}
+.ach-box .cnt{font-family:'Baloo 2',sans-serif; font-weight:700; font-size:20px; min-width:22px; text-align:center;}
+
+.empty-state{text-align:center; padding:40px 20px; color:var(--ink-soft);}
+.tag{display:inline-flex; align-items:center; gap:4px; background:var(--surface-alt); border:1px solid var(--border); padding:3px 9px; border-radius:999px; font-size:11.5px; font-weight:700;}
+.hint{font-size:12px; color:var(--ink-faint);}
+.divider{height:1px; background:var(--border); margin:16px 0;}
+[hidden]{display:none!important;}
+</style>
+</head>
+<body>
+<div class="app" id="app"><div class="empty-state">Loading…</div></div>
+<div id="modal-root"></div>
+<!-- ============================================================
+     FIREBASE SETUP — read FIREBASE-SETUP.md for step-by-step help.
+     1) Paste your project's config below (Firebase console → Project settings → your web app → SDK setup and configuration → "Config").
+     2) Make sure Firestore Database and Anonymous Authentication are turned on in your Firebase project.
+     3) (Optional) Turn on Storage if you want CSCs to be able to upload a profile photo file directly — otherwise they can still paste an image URL.
+     ============================================================ -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyC3hWjmkiQa0X9qB7vrnlq8skWH-UWrVjA",
+    authDomain: "csc-dashboard-1d376.firebaseapp.com",
+    projectId: "csc-dashboard-1d376",
+    storageBucket: "csc-dashboard-1d376.firebasestorage.app",
+    messagingSenderId: "813133913824",
+    appId: "1:813133913824:web:f4d8865486361df818fa85",
+    measurementId: "G-HEGTHD2GZJ"
+  };
+</script>
+
+<script>
+(function(){
+"use strict";
+
+/* =========================================================
+   0. DATE HELPERS
+========================================================= */
+const WEEKDAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const WEEKDAYS_SHORT_SUN_FIRST = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+function pad2(n){ return String(n).padStart(2,'0'); }
+function toISO(d){ return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+function parseISO(s){ const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); }
+function addDays(d,n){ const r = new Date(d); r.setDate(r.getDate()+n); return r; }
+function addMonths(d,n){ const r = new Date(d.getFullYear(), d.getMonth()+n, 1); return r; }
+function startOfWeekMonday(d){
+  const day = d.getDay(); // 0 Sun ... 6 Sat
+  const diff = (day === 0 ? -6 : 1 - day);
+  return addDays(new Date(d.getFullYear(),d.getMonth(),d.getDate()), diff);
+}
+function isSameDay(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+function todayDate(){ const d=new Date(); return new Date(d.getFullYear(),d.getMonth(),d.getDate()); }
+function monthTitle(d){ return MONTH_NAMES[d.getMonth()]+' '+d.getFullYear(); }
+function weekRangeLabel(weekStart){
+  const end = addDays(weekStart,6);
+  const f = (x)=> (x.getMonth()+1)+'/'+x.getDate();
+  return f(weekStart)+' – '+f(end);
+}
+function isoWeekOfYear(d){
+  // Monday-based week number within the year, simple approximation
+  const start = new Date(d.getFullYear(),0,1);
+  const firstMon = startOfWeekMonday(start);
+  const diffDays = Math.round((startOfWeekMonday(d) - firstMon) / 86400000);
+  return Math.floor(diffDays/7) + 1;
+}
+function monthMatrix(year, month){
+  const first = new Date(year, month, 1);
+  const last = new Date(year, month+1, 0);
+  const gridStart = startOfWeekMonday(first);
+  const gridEnd = startOfWeekMonday(last);
+  const weeks = [];
+  let cursor = gridStart;
+  while(cursor <= gridEnd){
+    const row = [];
+    for(let i=0;i<7;i++){ row.push(new Date(cursor)); cursor = addDays(cursor,1); }
+    weeks.push(row);
+  }
+  return weeks;
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function num(v, d){ const n = Number(v); return Number.isFinite(n) ? n : (d===undefined?null:d); }
+function pct(actual, target){ if(!target || target<=0) return null; return Math.round((actual||0)/target*100); }
+async function sha256Hex(text){
+  const enc = new TextEncoder().encode(text);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function slugify(s){
+  return String(s).trim().toLowerCase().replace(/[^a-z0-9一-龥]+/g,'-').replace(/(^-+|-+$)/g,'') || ('x'+Date.now());
+}
+const AVATAR_COLORS = ['#C98A12','#A6672C','#D9A404','#8C6D1F','#C1673B','#B4761E','#9C7A29','#B2571F'];
+function colorForName(name){
+  let h=0; for(let i=0;i<name.length;i++) h = (h*31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+function initials(name){ return (name||'?').trim().slice(0,1).toUpperCase(); }
+
+/* =========================================================
+   1. STATE
+========================================================= */
+const S = {
+  db: null,
+  assets: null,
+  dbReady: false,
+  role: null,        // 'csc' | 'admin' | null
+  cscId: null,       // the profile currently being VIEWED (any CSC, or admin drilled-in)
+  adminUnlocked: false,
+  profiles: [],      // live array from subscription
+  outlets: [],
+  configDoc: null,
+  tab: 'overview',
+  calCursor: todayDate(),
+  weekCursor: startOfWeekMonday(todayDate()),
+  monthlyYear: todayDate().getFullYear(),
+  historyCursor: todayDate(),
+  cache: {},         // scratch cache for fetched range data
+  subs: [],          // active onSnapshot unsubscribes for current view
+  adminHomeSub: { profilesToday:{}, profilesWeek:{} },
+};
+
+function clearSubs(){ S.subs.forEach(u=>{ try{u();}catch(e){} }); S.subs = []; }
+function addSub(u){ S.subs.push(u); }
+
+function findProfile(id){ return S.profiles.find(p=>p.id===id) || null; }
+function activeProfiles(){ return S.profiles.filter(p=>p.active !== false).sort((a,b)=>(a.order||0)-(b.order||0)); }
+function outletName(id){ const o = S.outlets.find(o=>o.id===id); return o ? o.name : id; }
+// Any signed-in CSC can set a target on any profile (the team shares one open CSC login);
+// only Admin can ever touch Actual results and Achievements — that split still holds.
+function canEditTargetFor(p){ return S.role === 'admin' || S.role === 'csc'; }
+
+/* =========================================================
+   2. DB REFS
+========================================================= */
+function colProfiles(){ return S.db.collection('profiles'); }
+function colOutlets(){ return S.db.collection('outlets'); }
+function refConfig(){ return S.db.doc('meta/config'); }
+function colDaily(cscId){ return S.db.collection('daily/'+cscId+'/records'); }
+function refDaily(cscId, dateStr){ return colDaily(cscId).doc(dateStr); }
+function colWeekly(cscId){ return S.db.collection('weekly/'+cscId+'/records'); }
+function refWeekly(cscId, weekStr){ return colWeekly(cscId).doc(weekStr); }
+// Monthly figures are set directly per month (not auto-summed from daily/weekly —
+// those may have gaps), same target/actual split and permission rule as everywhere else.
+function colMonthly(cscId){ return S.db.collection('monthly/'+cscId+'/records'); }
+function refMonthly(cscId, monthStr){ return colMonthly(cscId).doc(monthStr); }
+// Team schedule is shared across everyone (not per-CSC): one doc per calendar month,
+// holding a map of date -> array of {time, text} entries. Admin-only to edit.
+function refScheduleMonth(monthStr){ return S.db.doc('schedule/'+monthStr); }
+// Personal schedule: each CSC's own to-do list on their own calendar (like setting
+// an appointment on your phone) — any signed-in CSC or Admin can edit it, same rule
+// as targets. Kept separate from the shared Team Schedule below.
+function refPersonalScheduleMonth(cscId, monthStr){ return S.db.doc('schedulePersonal/'+cscId+'/months/'+monthStr); }
+
+async function upsert(ref, data){
+  // merge:true deep-merges nested maps (e.g. outlets.<id>.tuTarget) and works
+  // whether the document already exists or not — no separate "create" path needed.
+  await ref.set(data, { merge: true });
+}
+
+/* =========================================================
+   3. BOOT
+========================================================= */
+function makeFirebaseAssets(storage){
+  return {
+    async upload(file){
+      const id = 'photo_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+      const ref = storage.ref().child('photos/'+id+'-'+file.name.replace(/[^a-zA-Z0-9_.-]/g,'_'));
+      await ref.put(file);
+      const url = await ref.getDownloadURL();
+      return { id, url };
+    }
+  };
+}
+
+async function boot(){
+  if(!window.firebase || !firebaseConfig || !firebaseConfig.apiKey || firebaseConfig.apiKey === 'YOUR_API_KEY'){
+    renderNoDb('config');
+    return;
+  }
+  try{
+    if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    await firebase.auth().signInAnonymously();
+    S.db = firebase.firestore();
+  }catch(e){
+    console.error('Firebase init failed', e);
+    renderNoDb('init');
+    return;
+  }
+  try{
+    S.assets = firebaseConfig.storageBucket && firebaseConfig.storageBucket !== 'YOUR_PROJECT.appspot.com'
+      ? makeFirebaseAssets(firebase.storage())
+      : null;
+  }catch(e){ S.assets = null; }
+
+  S.dbReady = true;
+
+  // live profiles + outlets
+  addSubGlobal(colProfiles().onSnapshot(snap=>{
+    S.profiles = snap.docs.map(d=>Object.assign({id:d.id}, d.data()));
+    renderCurrent();
+  }, err=>{ console.error('profiles sub', err); }));
+
+  addSubGlobal(colOutlets().onSnapshot(snap=>{
+    S.outlets = snap.docs.map(d=>Object.assign({id:d.id}, d.data())).sort((a,b)=>(a.order||0)-(b.order||0));
+    renderCurrent();
+  }, err=>{ console.error('outlets sub', err); }));
+
+  addSubGlobal(refConfig().onSnapshot(snap=>{
+    S.configDoc = snap.exists ? snap.data() : null;
+    renderCurrent();
+  }, err=>{ console.error('config sub', err); }));
+
+  // restore last used role (per-viewer convenience only)
+  try{
+    const lastRole = localStorage.getItem('csc_last_role');
+    if(lastRole === 'csc'){ S.role='csc'; S.cscId=null; S.tab='team'; }
+  }catch(e){}
+
+  renderCurrent();
+}
+const globalSubs = [];
+function addSubGlobal(u){ globalSubs.push(u); }
+
+function renderNoDb(reason){
+  const msg = reason === 'config'
+    ? 'This page still has placeholder values in <code>firebaseConfig</code> near the top of the HTML file. Paste your real Firebase project config there (see FIREBASE-SETUP.md), then refresh.'
+    : 'Could not connect to Firebase. Check that Firestore Database and Anonymous Authentication are turned on for this project, and that your firebaseConfig values are correct, then refresh.';
+  document.getElementById('app').innerHTML =
+    '<div class="role-wrap"><div class="card role-card">'+
+    '<div style="font-size:34px;margin-bottom:8px;">🔒</div>'+
+    '<h2 class="display">Can\'t connect right now</h2>'+
+    '<p class="section-sub">'+msg+'</p>'+
+    '</div></div>';
+}
+
+/* =========================================================
+   4. EVENT DELEGATION
+========================================================= */
+const appEl = document.getElementById('app');
+const modalEl = document.getElementById('modal-root');
+
+function on(root, evt, handler){ root.addEventListener(evt, handler); }
+
+on(appEl, 'click', (e)=>{ const t = e.target.closest('[data-act]'); if(t) dispatch(t, e); });
+on(modalEl, 'click', (e)=>{ const t = e.target.closest('[data-act]'); if(t) dispatch(t, e); });
+on(appEl, 'change', (e)=>{ const t = e.target.closest('[data-act-change]'); if(t) dispatchChange(t, e); });
+on(modalEl, 'change', (e)=>{ const t = e.target.closest('[data-act-change]'); if(t) dispatchChange(t, e); });
+on(appEl, 'submit', (e)=>{ const t = e.target.closest('[data-act-submit]'); if(t){ e.preventDefault(); dispatchSubmit(t, e); } });
+on(modalEl, 'submit', (e)=>{ const t = e.target.closest('[data-act-submit]'); if(t){ e.preventDefault(); dispatchSubmit(t, e); } });
+
+function dv(el, name){ return el.dataset[name]; }
+
+function dispatch(el, e){
+  const act = el.dataset.act;
+  const fn = ACTIONS[act];
+  if(fn) fn(el, e);
+}
+function dispatchChange(el, e){
+  const act = el.dataset.actChange;
+  const fn = ACTIONS[act];
+  if(fn) fn(el, e);
+}
+function dispatchSubmit(el, e){
+  const act = el.dataset.actSubmit;
+  const fn = ACTIONS[act];
+  if(fn) fn(el, e);
+}
+
+let toastTimer = null;
+function toast(msg){
+  let t = document.getElementById('csc-toast');
+  if(!t){
+    t = document.createElement('div');
+    t.id = 'csc-toast';
+    t.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:13px;font-weight:700;z-index:200;box-shadow:var(--shadow);max-width:90vw;text-align:center;';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ t.style.display = 'none'; }, 3200);
+}
+window.addEventListener('unhandledrejection', (e)=>{
+  const code = e && e.reason && e.reason.code;
+  if(code){
+    let msg = 'Save failed — please try again.';
+    if(code === 'permission-denied') msg = 'This account doesn\'t have permission to save — check your Firestore security rules.';
+    if(code === 'resource-exhausted') msg = 'Too many actions at once — please wait a few seconds and try again.';
+    if(code === 'unavailable') msg = 'Can\'t reach the database right now — check your connection and try again.';
+    if(code === 'unauthenticated') msg = 'Your session expired — please refresh the page.';
+    if(code === 'invalid_argument') msg = 'This account doesn\'t have edit access yet. Please ask whoever shared this page to turn on editing.';
+    if(code === 'resource_exhausted') msg = 'Too many actions at once — please wait a few seconds and try again.';
+    if(code === 'revoked') msg = 'Access to this page has changed — please refresh.';
+    toast(msg);
+    console.error('DB error', e.reason);
+    e.preventDefault();
+  }
+});
+
+function closeModal(){ modalEl.innerHTML = ''; }
+function openModal(html){ modalEl.innerHTML = '<div class="overlay"><div class="modal">'+html+'</div></div>'; }
+// clicking directly on the dimmed background (not its contents) closes the modal.
+// NOTE: deliberately NOT using data-act here — data-act dispatch uses closest(),
+// which would bubble from any click inside the modal up to an ancestor's data-act
+// and close the modal on every interior click (checkboxes, text fields, ...).
+on(modalEl, 'click', (e)=>{ if(e.target.classList.contains('overlay')) closeModal(); });
+
+/* =========================================================
+   5. RENDER DISPATCH
+========================================================= */
+function renderCurrent(){
+  clearSubs();
+  if(!S.dbReady) return;
+  if(!S.role){ renderRoleScreen(); return; }
+  if(S.role === 'admin' && !S.adminUnlocked){ renderAdminLogin(); return; }
+  if(S.role === 'admin' && !S.cscId){
+    if(S.tab === 'admin-panel') renderAdminPanel();
+    else renderAdminHome();
+    return;
+  }
+  if(S.role === 'csc' && !S.cscId){ renderCscTeamView(); return; }
+  // profile view (own profile, a teammate's, or admin drilled into a csc)
+  renderProfileShell();
+}
+
+function switchTab(tab){ S.tab = tab; renderCurrent(); }
+
+/* =========================================================
+   6. ROLE SCREEN
+========================================================= */
+function renderRoleScreen(){
+  appEl.innerHTML =
+  '<div class="role-wrap"><div class="card role-card">'+
+    '<div class="brand-mark" style="margin:0 auto 14px;">U</div>'+
+    '<h2 class="display" style="margin:0 0 6px;">URKLINIK Performance Hub</h2>'+
+    '<p class="section-sub" style="margin-bottom:0;">Choose your role to sign in</p>'+
+    '<div class="role-grid">'+
+      '<div class="role-opt" data-act="pick-csc-mode"><div class="ic">🙋</div>CSC Mode</div>'+
+      '<div class="role-opt" data-act="pick-admin-mode"><div class="ic">⚙️</div>Admin Mode</div>'+
+    '</div>'+
+  '</div></div>';
+}
+const ACTIONS = {};
+ACTIONS['pick-csc-mode'] = ()=>{
+  S.role='csc'; S.cscId=null; S.tab='team';
+  try{ localStorage.setItem('csc_last_role','csc'); localStorage.removeItem('csc_last_id'); }catch(e){}
+  renderCurrent();
+};
+ACTIONS['pick-admin-mode'] = ()=>{ S.role='admin'; renderCurrent(); };
+ACTIONS['switch-role'] = ()=>{
+  S.role=null; S.cscId=null; S.adminUnlocked=false; S.tab='overview';
+  try{ localStorage.removeItem('csc_last_role'); localStorage.removeItem('csc_last_id'); }catch(e){}
+  renderCurrent();
+};
+
+/* =========================================================
+   7. ADMIN LOGIN
+========================================================= */
+function renderAdminLogin(){
+  const needsSetup = !S.configDoc || !S.configDoc.adminPasswordHash;
+  appEl.innerHTML =
+  '<div class="role-wrap"><div class="card role-card">'+
+    '<div style="font-size:30px;">⚙️</div>'+
+    '<h2 class="display" style="margin:8px 0 4px;">'+(needsSetup? 'Set Admin Password' : 'Admin Sign In')+'</h2>'+
+    '<p class="section-sub">'+(needsSetup? 'First time here — set an admin password (you can change it later in the control panel).' : 'Enter the admin password')+'</p>'+
+    '<form data-act-submit="'+(needsSetup?'admin-setup-submit':'admin-login-submit')+'" class="stack" style="text-align:left;">'+
+      '<div class="field"><label>Password</label><input type="password" id="admin-pw" required minlength="4" autocomplete="'+(needsSetup?'new-password':'current-password')+'"></div>'+
+      (needsSetup ? '<div class="field"><label>Confirm password</label><input type="password" id="admin-pw2" required minlength="4"></div>' : '')+
+      '<div id="admin-login-err" class="hint" style="color:var(--danger);"></div>'+
+      '<button class="btn" type="submit">'+(needsSetup?'Set & Sign In':'Sign In')+'</button>'+
+    '</form>'+
+    '<button class="btn-ghost" style="margin-top:14px;" data-act="switch-role">← Back to role selection</button>'+
+  '</div></div>';
+}
+ACTIONS['admin-setup-submit'] = async (el)=>{
+  const pw = document.getElementById('admin-pw').value;
+  const pw2 = document.getElementById('admin-pw2').value;
+  const errEl = document.getElementById('admin-login-err');
+  if(pw !== pw2){ errEl.textContent = 'Passwords don\'t match'; return; }
+  if(pw.length < 4){ errEl.textContent = 'Password must be at least 4 characters'; return; }
+  const hash = await sha256Hex(pw);
+  await upsert(refConfig(), { adminPasswordHash: hash });
+  S.adminUnlocked = true; S.tab = 'admin-home';
+  renderCurrent();
+};
+ACTIONS['admin-login-submit'] = async (el)=>{
+  const pw = document.getElementById('admin-pw').value;
+  const errEl = document.getElementById('admin-login-err');
+  const hash = await sha256Hex(pw);
+  if(S.configDoc && hash === S.configDoc.adminPasswordHash){
+    S.adminUnlocked = true; S.tab = 'admin-home';
+    renderCurrent();
+  } else {
+    errEl.textContent = 'Incorrect password — please try again';
+  }
+};
+
+/* =========================================================
+   8. SHARED: TOPBAR + NAV (profile shell)
+========================================================= */
+function topbarHtml(opts){
+  // opts: {title, sub, backAct, backLabel, rightHtml}
+  return '<div class="topbar"><div class="topbar-row">'+
+    '<div class="brand">'+
+      '<div class="brand-mark">U</div>'+
+      '<div class="brand-text"><div class="t1">URKLINIK</div><div class="t2">'+esc(opts.title)+'</div></div>'+
+    '</div>'+
+    '<div class="row wrap">'+
+      (opts.backAct ? '<button class="btn-ghost" data-act="'+opts.backAct+'">'+esc(opts.backLabel||'← Back')+'</button>' : '')+
+      (opts.rightHtml||'')+
+      '<button class="btn-ghost" data-act="switch-role">Switch role</button>'+
+    '</div>'+
+  '</div>'+
+  (opts.navHtml||'')+
+  '</div>';
+}
+
+function profileNavHtml(active, isAdmin){
+  const tabs = [
+    ['overview','📈','Overview'],
+    ['calendar','📅','Calendar'],
+    ['weekly','🎯','Weekly'],
+    ['monthly','📊','Monthly'],
+    ['outlet','🏢','Outlet'],
+    ['achievements','🏆','Achievements'],
+  ];
+  if(isAdmin) tabs.push(['history','📋','History']);
+  return '<div class="nav">'+tabs.map(([id,ic,label])=>
+    '<div class="navlink'+(id==='history'?' admin':'')+(active===id?' active':'')+'" data-act="profile-tab" data-tab="'+id+'">'+ic+' '+label+'</div>'
+  ).join('')+'</div>';
+}
+ACTIONS['profile-tab'] = (el)=>{ S.tab = el.dataset.tab; renderCurrent(); };
+ACTIONS['back-to-admin-home'] = ()=>{ S.cscId=null; S.tab='admin-home'; renderCurrent(); };
+ACTIONS['open-profile'] = (el)=>{ S.cscId = el.dataset.id; S.tab='overview'; renderCurrent(); };
+
+/* =========================================================
+   9. PROFILE SHELL (CSC self-view OR admin drilled-in)
+========================================================= */
+function renderProfileShell(){
+  const p = findProfile(S.cscId);
+  if(!p){
+    if(S.role==='admin'){ S.cscId=null; S.tab='admin-home'; }
+    else if(S.role==='csc'){ S.cscId=null; S.tab='team'; } // that profile disappeared — back to Team Overview
+    else { S.role=null; }
+    renderCurrent();
+    return;
+  }
+  const isAdmin = S.role === 'admin';
+  const avatarHtml = p.photoUrl
+    ? '<img class="avatar" src="'+esc(p.photoUrl)+'" alt="">'
+    : '<div class="avatar" style="background:'+colorForName(p.name)+';">'+esc(initials(p.name))+'</div>';
+
+  appEl.innerHTML =
+    topbarHtml({
+      title: p.name + '\'s Performance Profile',
+      backAct: isAdmin ? 'back-to-admin-home' : (S.role==='csc' ? 'go-team-view' : null),
+      backLabel: '← Team Overview',
+      navHtml: profileNavHtml(S.tab, isAdmin),
+      rightHtml: ''
+    }) +
+    '<div class="card" style="margin-bottom:16px;"><div class="row" style="gap:16px;">'+
+      avatarHtml+
+      '<div style="flex:1;min-width:0;">'+
+        '<div class="section-title" style="margin-bottom:2px;">'+esc(p.name)+'</div>'+
+        '<div class="row wrap" style="gap:6px;">'+
+          (p.outlets&&p.outlets.length ? p.outlets.map(oid=>'<span class="tag">🏢 '+esc(outletName(oid))+'</span>').join('') : '<span class="hint">No outlet assigned yet</span>')+
+        '</div>'+
+      '</div>'+
+      '<div class="badges">'+badgesHtml(p)+'</div>'+
+    '</div></div>'+
+    '<div id="profile-content"><div class="empty-state">Loading…</div></div>';
+
+  loadProfileTab(p, isAdmin);
+}
+
+function badgesHtml(p){
+  const t = num(p.trophies,0), h = num(p.hearts,0);
+  if(t<=0 && h<=0) return '<span class="empty">No achievements yet</span>';
+  let out = '';
+  if(t>0) out += '<span title="Champion trophy">'+'🏆'.repeat(Math.min(t,12))+'</span>';
+  if(h>0) out += '<span title="20+ TU in a week" style="margin-left:4px;">'+'🤎'.repeat(Math.min(h,12))+'</span>';
+  return out;
+}
+
+function loadProfileTab(p, isAdmin){
+  if(S.tab==='history' && !isAdmin) S.tab = 'overview'; // CSCs never see History, even if it was left selected
+  if(S.tab==='overview') return loadOverviewTab(p, isAdmin);
+  if(S.tab==='calendar') return loadCalendarTab(p, isAdmin);
+  if(S.tab==='weekly') return loadWeeklyTab(p, isAdmin);
+  if(S.tab==='monthly') return loadMonthlyTab(p, isAdmin);
+  if(S.tab==='outlet') return loadOutletTab(p, isAdmin);
+  if(S.tab==='achievements') return renderAchievementsTab(p, isAdmin);
+  if(S.tab==='history') return loadHistoryTab(p, isAdmin);
+}
+
+function contentEl(){ return document.getElementById('profile-content'); }
+
+/* =========================================================
+   10. OVERVIEW TAB
+========================================================= */
+function loadOverviewTab(p, isAdmin){
+  clearSubs();
+  const todayStr = toISO(todayDate());
+  const weekStart = startOfWeekMonday(todayDate());
+  const weekStr = toISO(weekStart);
+  S.cache.todayDoc = {}; S.cache.weekDoc = {}; S.cache.aggregates = null;
+  addSub(refDaily(p.id, todayStr).onSnapshot(snap=>{
+    S.cache.todayDoc = snap.exists ? snap.data() : {};
+    renderOverviewContent(p, isAdmin, todayStr, weekStr);
+  }, ()=>{}));
+  addSub(refWeekly(p.id, weekStr).onSnapshot(snap=>{
+    S.cache.weekDoc = snap.exists ? snap.data() : {};
+    renderOverviewContent(p, isAdmin, todayStr, weekStr);
+  }, ()=>{}));
+  loadAggregates(p.id).then(agg=>{ S.cache.aggregates = agg; renderOverviewContent(p, isAdmin, todayStr, weekStr); }).catch(()=>{});
+  renderOverviewContent(p, isAdmin, todayStr, weekStr);
+}
+
+async function loadAggregates(cscId){
+  const today = todayDate();
+  let tuMonth = 0;
+  try{
+    const wAll = await colWeekly(cscId).orderBy('weekStart','desc').limit(60).get();
+    wAll.docs.forEach(d=>{
+      const wd = d.data();
+      if(!wd.weekStart) return;
+      const ws = parseISO(wd.weekStart);
+      if(ws.getMonth()===today.getMonth() && ws.getFullYear()===today.getFullYear()) tuMonth += num(wd.tuActual,0);
+    });
+  }catch(e){}
+  return { tuMonth };
+}
+
+function statusPill(actual, target){
+  if(target===null || target===undefined || target===''){
+    if(actual>0) return '<span class="pill neutral">Recorded</span>';
+    return '<span class="pill neutral">No target set</span>';
+  }
+  const a = num(actual,0), t = num(target,0);
+  if(a >= t && t>0) return '<span class="pill success">✅ Achieved +'+(a-t)+'</span>';
+  if(a > 0) return '<span class="pill warning">Short by '+(t-a)+'</span>';
+  return '<span class="pill neutral">In progress</span>';
+}
+
+function renderOverviewContent(p, isAdmin, todayStr, weekStr){
+  const td = S.cache.todayDoc || {};
+  const wd = S.cache.weekDoc || {};
+  const agg = S.cache.aggregates;
+  const apptTarget = td.apptTarget ?? null, apptActual = td.apptActual ?? null;
+  const tuTarget = wd.tuTarget ?? null, tuActual = wd.tuActual ?? null;
+  const tuPct = pct(tuActual, tuTarget);
+  const canEditTarget = canEditTargetFor(p); // true whenever isAdmin, so this alone gates the whole edit grid
+
+  contentEl().innerHTML = '<div class="stack">'+
+
+    '<div class="grid cols-4">'+
+      '<div class="stat-tile hero"><div class="label">🎯 Today\'s APPT Target</div><div class="value">'+(apptTarget??'—')+'</div>'+statusPill(apptActual, apptTarget)+'</div>'+
+      '<div class="stat-tile"><div class="label">✅ Today\'s Actual APPT</div><div class="value">'+(apptActual??'—')+'</div><div class="sub">Diff '+((apptActual!=null&&apptTarget!=null)?(apptActual-apptTarget>=0?'+':'')+(apptActual-apptTarget):'—')+'</div></div>'+
+      '<div class="stat-tile"><div class="label">🎯 This Week\'s TU Target</div><div class="value">'+(tuTarget??'—')+'</div><div class="sub">Week '+isoWeekOfYear(parseISO(weekStr))+' · '+weekRangeLabel(parseISO(weekStr))+'</div></div>'+
+      '<div class="stat-tile"><div class="label">📈 This Week\'s Actual TU</div><div class="value">'+(tuActual??'—')+'</div>'+statusPill(tuActual, tuTarget)+'</div>'+
+    '</div>'+
+
+    '<div class="card">'+
+      '<div class="card-title">This Week\'s TU Progress</div>'+
+      '<div class="spread" style="margin-bottom:8px;"><span style="font-variant-numeric:tabular-nums;font-weight:700;">'+(tuActual??0)+' / '+(tuTarget??'—')+' TU</span>'+(tuPct!=null?'<span class="pill '+(tuPct>=100?'success':tuPct>=60?'warning':'danger')+'">'+tuPct+'%</span>':'')+'</div>'+
+      '<div class="progress-track"><div class="progress-fill '+(tuPct!=null&&tuPct>=100?'success':tuPct!=null&&tuPct<60?'warning':'')+'" style="width:'+Math.min(100,tuPct||0)+'%;"></div></div>'+
+    '</div>'+
+
+    (canEditTarget ? (
+    '<div class="grid cols-2">'+
+      '<div class="card">'+
+        '<div class="card-title">🎯 Set Today\'s APPT Target</div>'+
+        '<div class="row" style="align-items:flex-end;gap:8px;">'+
+          '<div class="field" style="flex:1;"><label>How many APPT are you aiming for today?</label><input type="number" min="0" id="in-today-target" value="'+(apptTarget??'')+'"></div>'+
+          '<button class="btn sm" data-act="save-today-target" data-csc="'+p.id+'" data-date="'+todayStr+'">Save Target</button>'+
+        '</div>'+
+        (isAdmin ? (
+        '<div class="divider"></div><div class="card-title">✅ Update Today\'s Actual APPT (Admin)</div>'+
+        '<div class="row" style="align-items:flex-end;gap:8px;">'+
+          '<div class="field" style="flex:1;"><label>Actual APPT completed</label><input type="number" min="0" id="in-today-actual" value="'+(apptActual??'')+'"></div>'+
+          '<button class="btn sm secondary" data-act="save-today-actual" data-csc="'+p.id+'" data-date="'+todayStr+'">Save Actual</button>'+
+        '</div>') : '')+
+      '</div>'+
+      '<div class="card">'+
+        '<div class="card-title">🎯 Monday: Set This Week\'s TU Target</div>'+
+        '<div class="row" style="align-items:flex-end;gap:8px;">'+
+          '<div class="field" style="flex:1;"><label>This week\'s TU target</label><input type="number" min="0" id="in-week-target" value="'+(tuTarget??'')+'"></div>'+
+          '<button class="btn sm" data-act="save-week-target" data-csc="'+p.id+'" data-week="'+weekStr+'">Save Target</button>'+
+        '</div>'+
+        (isAdmin ? (
+        '<div class="divider"></div><div class="card-title">📈 Update This Week\'s Actual TU (Admin)</div>'+
+        '<div class="row" style="align-items:flex-end;gap:8px;">'+
+          '<div class="field" style="flex:1;"><label>This week\'s actual TU</label><input type="number" min="0" id="in-week-actual" value="'+(tuActual??'')+'"></div>'+
+          '<button class="btn sm secondary" data-act="save-week-actual" data-csc="'+p.id+'" data-week="'+weekStr+'">Save Actual</button>'+
+        '</div>') : '')+
+      '</div>'+
+    '</div>') : '')+
+
+    '<div class="stat-tile"><div class="label">📈 This Month\'s TU</div><div class="value">'+(agg?agg.tuMonth:'…')+'</div></div>'+
+
+  '</div>';
+}
+
+ACTIONS['save-today-target'] = async (el)=>{
+  const csc = el.dataset.csc, date = el.dataset.date;
+  const v = document.getElementById('in-today-target').value;
+  el.disabled = true;
+  try{ await upsert(refDaily(csc,date), { date, apptTarget: v===''?null:num(v,0), targetSetAt: new Date().toISOString() }); }
+  finally{ el.disabled = false; }
+};
+ACTIONS['save-today-actual'] = async (el)=>{
+  const csc = el.dataset.csc, date = el.dataset.date;
+  const v = document.getElementById('in-today-actual').value;
+  el.disabled = true;
+  try{ await upsert(refDaily(csc,date), { date, apptActual: v===''?null:num(v,0), actualSetAt: new Date().toISOString() }); }
+  finally{ el.disabled = false; }
+};
+ACTIONS['save-week-target'] = async (el)=>{
+  const csc = el.dataset.csc, week = el.dataset.week;
+  const v = document.getElementById('in-week-target').value;
+  el.disabled = true;
+  try{ await upsert(refWeekly(csc,week), { weekStart: week, tuTarget: v===''?null:num(v,0), targetSetAt: new Date().toISOString() }); }
+  finally{ el.disabled = false; }
+};
+ACTIONS['save-week-actual'] = async (el)=>{
+  const csc = el.dataset.csc, week = el.dataset.week;
+  const v = document.getElementById('in-week-actual').value;
+  el.disabled = true;
+  try{ await upsert(refWeekly(csc,week), { weekStart: week, tuActual: v===''?null:num(v,0), actualSetAt: new Date().toISOString() }); }
+  finally{ el.disabled = false; }
+};
+
+/* =========================================================
+   11. CALENDAR TAB
+========================================================= */
+function loadCalendarTab(p, isAdmin){
+  clearSubs();
+  const year = S.calCursor.getFullYear(), month = S.calCursor.getMonth();
+  const startStr = toISO(new Date(year,month,1));
+  const endStr = toISO(new Date(year,month+1,0));
+  const monthStr = year+'-'+pad2(month+1);
+  S.cache.calDocs = {};
+  S.cache.scheduleDocs = {};
+  S.cache.personalScheduleDocs = {};
+  addSub(colDaily(p.id).where('date','>=',startStr).where('date','<=',endStr).orderBy('date').onSnapshot(snap=>{
+    const map = {}; snap.docs.forEach(d=>{ map[d.id] = d.data(); });
+    S.cache.calDocs = map;
+    renderCalendarContent(p, isAdmin);
+  }, ()=>{ renderCalendarContent(p, isAdmin); }));
+  addSub(refScheduleMonth(monthStr).onSnapshot(snap=>{
+    const dd = snap.exists ? snap.data() : {};
+    S.cache.scheduleDocs = (dd && dd.days) ? dd.days : {};
+    renderCalendarContent(p, isAdmin);
+    refreshDayScheduleListIfOpen();
+  }, ()=>{ S.cache.scheduleDocs = {}; renderCalendarContent(p, isAdmin); }));
+  addSub(refPersonalScheduleMonth(p.id, monthStr).onSnapshot(snap=>{
+    const dd = snap.exists ? snap.data() : {};
+    S.cache.personalScheduleDocs = (dd && dd.days) ? dd.days : {};
+    renderCalendarContent(p, isAdmin);
+    refreshDayScheduleListIfOpen();
+  }, ()=>{ S.cache.personalScheduleDocs = {}; renderCalendarContent(p, isAdmin); }));
+  S.cache.calCtx = { p, isAdmin };
+  renderCalendarContent(p, isAdmin);
+}
+ACTIONS['cal-prev'] = (el)=>{ S.calCursor = addMonths(S.calCursor,-1); loadCalendarTab(findProfile(S.cscId), S.role==='admin'); };
+ACTIONS['cal-next'] = (el)=>{ S.calCursor = addMonths(S.calCursor,1); loadCalendarTab(findProfile(S.cscId), S.role==='admin'); };
+ACTIONS['cal-today'] = ()=>{ S.calCursor = todayDate(); loadCalendarTab(findProfile(S.cscId), S.role==='admin'); };
+
+function timeRangeLabel(it){
+  if(it.start && it.end) return it.start+'–'+it.end;
+  if(it.start) return it.start;
+  return it.time || '—'; // backward-compat with older single-time entries
+}
+
+function dayChipsHtml(dateStr, scheduleDocs, personalDocs){
+  const personalItems = (Array.isArray(personalDocs[dateStr]) ? personalDocs[dateStr] : []).map(it=>Object.assign({}, it, { _scope:'personal' }));
+  const teamItems = (Array.isArray(scheduleDocs[dateStr]) ? scheduleDocs[dateStr] : []).map(it=>Object.assign({}, it, { _scope:'team' }));
+  const all = personalItems.concat(teamItems).sort((a,b)=>String(a.start||a.time||'').localeCompare(String(b.start||b.time||'')));
+  if(!all.length) return '';
+  const MAX_SHOW = 2;
+  const shown = all.slice(0, MAX_SHOW);
+  const extra = all.length - shown.length;
+  let html = '<div class="day-chips">';
+  shown.forEach(it=>{
+    const tip = (it._scope==='team'?'Team · ':'Me · ')+timeRangeLabel(it)+' '+(it.text||'');
+    html += '<span class="day-chip '+it._scope+'" title="'+esc(tip)+'">'+esc(it.text||'')+'</span>';
+  });
+  if(extra>0) html += '<span class="day-chip more">+'+extra+' more</span>';
+  html += '</div>';
+  return html;
+}
+
+function renderCalendarContent(p, isAdmin){
+  const year = S.calCursor.getFullYear(), month = S.calCursor.getMonth();
+  const weeks = monthMatrix(year, month);
+  const docs = S.cache.calDocs || {};
+  const scheduleDocs = S.cache.scheduleDocs || {};
+  const personalDocs = S.cache.personalScheduleDocs || {};
+  const today = todayDate();
+  const canEditTarget = canEditTargetFor(p);
+  const canEditPersonal = canEditTargetFor(p); // same "any signed-in CSC or Admin" rule as targets
+
+  let grid = '<div class="cal-head">'+WEEKDAYS.map(d=>'<span>'+d+'</span>').join('')+'</div><div class="cal-grid">';
+  weeks.forEach(row=>{
+    row.forEach(d=>{
+      const inMonth = d.getMonth()===month;
+      const dateStr = toISO(d);
+      const doc = docs[dateStr] || {};
+      const target = doc.apptTarget, actual = doc.apptActual;
+      let cls = 'day-cell';
+      if(!inMonth) cls += ' outmonth';
+      if(inMonth && isSameDay(d,today)) cls += ' today';
+      if(inMonth && actual!=null && target!=null && target>0){
+        if(actual>=target) cls += ' ach';
+        else if(actual >= target*0.6) cls += ' mid';
+        else cls += ' low';
+      }
+      const info = (target!=null?('🎯'+target):'') + (actual!=null?(' ✅'+actual):'');
+      const chipsHtml = inMonth ? dayChipsHtml(dateStr, scheduleDocs, personalDocs) : '';
+      grid += '<div class="'+cls+'"'+(inMonth?(' data-act="open-day" data-date="'+dateStr+'" data-csc="'+p.id+'" data-admin="'+(isAdmin?1:0)+'" data-can-edit-target="'+(canEditTarget?1:0)+'"'):'')+'>'+
+        '<div class="dnum">'+d.getDate()+'</div>'+(info?'<div class="dinfo">'+info+'</div>':'')+chipsHtml+
+      '</div>';
+    });
+  });
+  grid += '</div>';
+
+  const teamHasItems = Object.keys(scheduleDocs).some(d=>Array.isArray(scheduleDocs[d]) && scheduleDocs[d].length>0);
+
+  // Team Schedule is a broadcast, not a form to fill in — so it stays out of the way
+  // entirely until Admin has actually put something on it. Admin still gets a small
+  // link to add the first item; CSCs see nothing until then.
+  let teamCardHtml = '';
+  if(teamHasItems){
+    teamCardHtml =
+      '<div class="card" style="margin-top:16px;">'+
+        '<div class="spread" style="margin-bottom:10px;">'+
+          '<div class="card-title" style="margin:0;">📌 Team Schedule — '+monthTitle(S.calCursor)+'</div>'+
+          (isAdmin ? '<button class="btn sm" data-act="open-add-schedule" data-scope="team">+ Add</button>' : '')+
+        '</div>'+
+        '<p class="hint" style="margin:0 0 10px;">Something everyone needs to do at the same time — this shows up on every CSC\'s calendar. Only Admin can set this.</p>'+
+        monthScheduleSectionHtml(scheduleDocs, isAdmin, 'team')+
+      '</div>';
+  } else if(isAdmin){
+    teamCardHtml =
+      '<div class="row" style="margin-top:12px;">'+
+        '<button class="btn-ghost" data-act="open-add-schedule" data-scope="team">📌 + Add Team Schedule</button>'+
+      '</div>';
+  }
+
+  contentEl().innerHTML =
+    '<div class="card">'+
+      '<div class="spread" style="margin-bottom:14px;">'+
+        '<button class="iconbtn" data-act="cal-prev">←</button>'+
+        '<div class="section-title" style="margin:0;">'+monthTitle(S.calCursor)+'</div>'+
+        '<button class="iconbtn" data-act="cal-next">→</button>'+
+      '</div>'+
+      grid+
+      '<div class="row" style="margin-top:12px;gap:14px;flex-wrap:wrap;">'+
+        '<span class="hint">🟢 Target met　🟠 Close to target　🔴 Behind target　·　<span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:var(--chip-personal-bg);border:1px solid var(--chip-personal-ink);vertical-align:middle;margin-right:2px;"></span>my schedule　<span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:var(--chip-team-bg);border:1px solid var(--chip-team-ink);vertical-align:middle;margin-right:2px;"></span>team schedule　·　Click a date for details</span>'+
+        '<button class="btn-ghost" data-act="cal-today" style="margin-left:auto;">Back to this month</button>'+
+      '</div>'+
+    '</div>'+
+    '<div class="card" style="margin-top:16px;">'+
+      '<div class="spread" style="margin-bottom:10px;">'+
+        '<div class="card-title" style="margin:0;">📝 My Schedule — '+esc(p.name)+' — '+monthTitle(S.calCursor)+'</div>'+
+        (canEditPersonal ? '<button class="btn sm" data-act="open-add-schedule" data-scope="personal">+ Add</button>' : '')+
+      '</div>'+
+      '<p class="hint" style="margin:0 0 10px;">Set what '+esc(p.name)+' needs to do and when — like setting an appointment on your own calendar. '+(canEditPersonal?'Anyone signed in can set this.':'Only Admin or a signed-in CSC can set this.')+'</p>'+
+      monthScheduleSectionHtml(personalDocs, canEditPersonal, 'personal')+
+    '</div>'+
+    teamCardHtml;
+}
+
+function monthScheduleSectionHtml(scheduleDocs, canEdit, scope){
+  const dates = Object.keys(scheduleDocs).filter(d=>Array.isArray(scheduleDocs[d]) && scheduleDocs[d].length>0).sort();
+  if(!dates.length) return '<p class="hint" style="margin:0;">Nothing set for this month yet.'+(canEdit?' Click "+ Add" above, or click any date on the calendar.':'')+'</p>';
+  return dates.map(dateStr=>{
+    const d = parseISO(dateStr);
+    const dayLabel = MONTH_NAMES[d.getMonth()]+' '+d.getDate()+' ('+WEEKDAYS_SHORT_SUN_FIRST[d.getDay()]+')';
+    const items = scheduleDocs[dateStr].slice().sort((a,b)=>String(a.start||a.time||'').localeCompare(String(b.start||b.time||'')));
+    const itemsHtml = items.map((it,idx)=>
+      '<div class="row" style="align-items:center;gap:8px;margin:3px 0;">'+
+        '<span class="pill">'+esc(timeRangeLabel(it))+'</span>'+
+        '<span style="flex:1;">'+esc(it.text||'')+'</span>'+
+        (canEdit ? '<button class="iconbtn sm" data-act="remove-schedule-item" data-scope="'+scope+'" data-date="'+dateStr+'" data-idx="'+idx+'" title="Remove">✕</button>' : '')+
+      '</div>'
+    ).join('');
+    return '<div style="padding:8px 0;border-bottom:1px solid var(--border);">'+
+      '<div class="card-title" style="margin:0 0 4px;">'+esc(dayLabel)+'</div>'+ itemsHtml +
+    '</div>';
+  }).join('');
+}
+
+ACTIONS['open-add-schedule'] = (el)=>{
+  const scope = el.dataset.scope; // 'team' | 'personal'
+  const year = S.calCursor.getFullYear(), month = S.calCursor.getMonth();
+  const today = todayDate();
+  const inThisMonth = today.getFullYear()===year && today.getMonth()===month;
+  const defaultDate = toISO(inThisMonth ? today : new Date(year,month,1));
+  const minDate = toISO(new Date(year,month,1));
+  const maxDate = toISO(new Date(year,month+1,0));
+  const p = S.cache.calCtx ? S.cache.calCtx.p : null;
+  const title = scope==='team' ? '📌 Add Team Schedule' : '📝 Add to '+esc(p?p.name:'')+'\'s Schedule';
+  const sub = scope==='team' ? 'This shows up on everyone\'s calendar for '+esc(monthTitle(S.calCursor))+'.' : 'This only shows up on '+esc(p?p.name:'this person')+'\'s calendar.';
+  openModal(
+    '<h3>'+title+'</h3>'+
+    '<p class="section-sub">'+sub+'</p>'+
+    '<div class="field" style="margin-bottom:14px;"><label>Date</label><input type="date" id="sched-date" value="'+defaultDate+'" min="'+minDate+'" max="'+maxDate+'"></div>'+
+    '<div class="grid cols-2" style="margin-bottom:14px;">'+
+      '<div class="field"><label>From</label><input type="time" id="sched-start"></div>'+
+      '<div class="field"><label>To (optional)</label><input type="time" id="sched-end"></div>'+
+    '</div>'+
+    '<div class="field" style="margin-bottom:14px;"><label>What to do</label><input type="text" id="sched-text" placeholder="e.g. Team briefing"></div>'+
+    '<div class="row" style="justify-content:flex-end;gap:8px;">'+
+      '<button class="btn secondary" data-act="modal-close">Cancel</button>'+
+      '<button class="btn" data-act="add-schedule-item-modal" data-scope="'+scope+'">Save</button>'+
+    '</div>'
+  );
+};
+ACTIONS['add-schedule-item-modal'] = async (el)=>{
+  const scope = el.dataset.scope;
+  const date = document.getElementById('sched-date').value;
+  const startVal = document.getElementById('sched-start').value;
+  const endVal = document.getElementById('sched-end').value;
+  const textVal = document.getElementById('sched-text').value.trim();
+  if(!date || !textVal) return;
+  el.disabled = true;
+  try{
+    await saveScheduleItem(scope, date, startVal, endVal, textVal);
+    closeModal();
+    refreshScheduleUI();
+  } finally { el.disabled = false; }
+};
+
+ACTIONS['open-day'] = async (el)=>{
+  const csc = el.dataset.csc, date = el.dataset.date, isAdmin = el.dataset.admin==='1', canEditTarget = el.dataset.canEditTarget==='1';
+  let data = {};
+  try{ const snap = await refDaily(csc,date).get(); data = snap.exists ? snap.data() : {}; }catch(e){}
+  const d = parseISO(date);
+  const label = MONTH_NAMES[d.getMonth()]+' '+d.getDate()+' ('+WEEKDAYS_SHORT_SUN_FIRST[d.getDay()]+')';
+  const notes = [];
+  if(!canEditTarget) notes.push('Only '+esc(findProfile(csc).name)+' or Admin can set the target.');
+  if(!isAdmin) notes.push('The actual figure can only be updated by Admin.');
+  S.cache.openDay = { csc, date };
+  const personalItems = (S.cache.personalScheduleDocs && Array.isArray(S.cache.personalScheduleDocs[date])) ? S.cache.personalScheduleDocs[date] : [];
+  const teamItems = (S.cache.scheduleDocs && Array.isArray(S.cache.scheduleDocs[date])) ? S.cache.scheduleDocs[date] : [];
+  openModal(
+    '<h3>'+label+'</h3>'+
+    '<p class="section-sub">'+esc(findProfile(csc).name)+'</p>'+
+    '<div class="grid cols-2" style="margin:14px 0;">'+
+      '<div class="field"><label>🎯 APPT Target</label><input type="number" min="0" id="day-target" value="'+(data.apptTarget??'')+'" '+(canEditTarget?'':'disabled')+'></div>'+
+      '<div class="field"><label>✅ Actual APPT</label><input type="number" min="0" id="day-actual" value="'+(data.apptActual??'')+'" '+(isAdmin?'':'disabled')+'></div>'+
+    '</div>'+
+    (notes.length ? '<p class="hint">'+notes.join(' ')+'</p>' : '')+
+    '<div class="row" style="justify-content:flex-end;gap:8px;">'+
+      '<button class="btn secondary" data-act="modal-close">Cancel</button>'+
+      (canEditTarget || isAdmin ? '<button class="btn" data-act="save-day-detail" data-csc="'+csc+'" data-date="'+date+'" data-admin="'+(isAdmin?1:0)+'" data-can-edit-target="'+(canEditTarget?1:0)+'">Save</button>' : '')+
+    '</div>'+
+    '<div class="divider"></div>'+
+    '<div class="card-title">📝 My Schedule</div>'+
+    '<div id="day-schedule-list-personal">'+scheduleListHtml(personalItems, canEditTarget, date, 'personal')+'</div>'+
+    '<div class="divider"></div>'+
+    '<div class="card-title">📌 Team Schedule</div>'+
+    '<div id="day-schedule-list-team">'+scheduleListHtml(teamItems, isAdmin, date, 'team')+'</div>'
+  );
+};
+function refreshDayScheduleListIfOpen(){
+  const open = S.cache.openDay;
+  if(!open) return;
+  const p = findProfile(open.csc);
+  const canEditTarget = p ? canEditTargetFor(p) : false;
+  const isAdmin = S.role==='admin';
+  const personalListEl = document.getElementById('day-schedule-list-personal');
+  if(personalListEl){
+    const items = (S.cache.personalScheduleDocs && Array.isArray(S.cache.personalScheduleDocs[open.date])) ? S.cache.personalScheduleDocs[open.date] : [];
+    personalListEl.innerHTML = scheduleListHtml(items, canEditTarget, open.date, 'personal');
+  }
+  const teamListEl = document.getElementById('day-schedule-list-team');
+  if(teamListEl){
+    const items = (S.cache.scheduleDocs && Array.isArray(S.cache.scheduleDocs[open.date])) ? S.cache.scheduleDocs[open.date] : [];
+    teamListEl.innerHTML = scheduleListHtml(items, isAdmin, open.date, 'team');
+  }
+}
+function scheduleListHtml(items, canEdit, date, scope){
+  const sorted = items.slice().sort((a,b)=>String(a.start||a.time||'').localeCompare(String(b.start||b.time||'')));
+  const rows = sorted.length ? sorted.map((it,idx)=>
+    '<div class="row" style="align-items:center;gap:8px;margin-bottom:6px;">'+
+      '<span class="pill">'+esc(timeRangeLabel(it))+'</span>'+
+      '<span style="flex:1;">'+esc(it.text||'')+'</span>'+
+      (canEdit ? '<button class="iconbtn sm" data-act="remove-schedule-item" data-scope="'+scope+'" data-date="'+date+'" data-idx="'+idx+'" title="Remove">✕</button>' : '')+
+    '</div>'
+  ).join('') : '<p class="hint" style="margin:0 0 8px;">Nothing set for this day yet.</p>';
+  const addForm = canEdit ?
+    '<div class="row" style="align-items:flex-end;gap:8px;margin-top:8px;flex-wrap:wrap;">'+
+      '<div class="field" style="width:110px;"><label>From</label><input type="time" id="sched-start-'+scope+'"></div>'+
+      '<div class="field" style="width:110px;"><label>To</label><input type="time" id="sched-end-'+scope+'"></div>'+
+      '<div class="field" style="flex:1;min-width:120px;"><label>What to do</label><input type="text" id="sched-text-'+scope+'" placeholder="e.g. Team briefing"></div>'+
+      '<button class="btn sm" data-act="add-schedule-item" data-scope="'+scope+'" data-date="'+date+'">+ Add</button>'+
+    '</div>' : '';
+  return rows + addForm;
+}
+async function saveScheduleItem(scope, date, start, end, text){
+  const monthStr = date.slice(0,7);
+  const ref = scope==='personal' ? refPersonalScheduleMonth(S.cache.calCtx.p.id, monthStr) : refScheduleMonth(monthStr);
+  const cache = scope==='personal' ? (S.cache.personalScheduleDocs = S.cache.personalScheduleDocs || {}) : (S.cache.scheduleDocs = S.cache.scheduleDocs || {});
+  const current = Array.isArray(cache[date]) ? cache[date] : [];
+  const updated = current.concat([{ start: start||'', end: end||'', text }]);
+  await upsert(ref, { days: { [date]: updated } });
+  cache[date] = updated;
+}
+async function removeScheduleItemAt(scope, date, idx){
+  const monthStr = date.slice(0,7);
+  const ref = scope==='personal' ? refPersonalScheduleMonth(S.cache.calCtx.p.id, monthStr) : refScheduleMonth(monthStr);
+  const cache = scope==='personal' ? (S.cache.personalScheduleDocs = S.cache.personalScheduleDocs || {}) : (S.cache.scheduleDocs = S.cache.scheduleDocs || {});
+  const current = Array.isArray(cache[date]) ? cache[date] : [];
+  const sorted = current.slice().sort((a,b)=>String(a.start||a.time||'').localeCompare(String(b.start||b.time||'')));
+  const toRemove = sorted[idx];
+  const updated = current.filter(it=>it!==toRemove);
+  await upsert(ref, { days: { [date]: updated } });
+  cache[date] = updated;
+}
+function refreshScheduleUI(){
+  refreshDayScheduleListIfOpen();
+  if(S.cache.calCtx && S.tab==='calendar') renderCalendarContent(S.cache.calCtx.p, S.cache.calCtx.isAdmin);
+}
+ACTIONS['add-schedule-item'] = async (el)=>{
+  const scope = el.dataset.scope, date = el.dataset.date;
+  const startVal = document.getElementById('sched-start-'+scope).value;
+  const endVal = document.getElementById('sched-end-'+scope).value;
+  const textVal = document.getElementById('sched-text-'+scope).value.trim();
+  if(!textVal) return;
+  el.disabled = true;
+  try{
+    await saveScheduleItem(scope, date, startVal, endVal, textVal);
+    refreshScheduleUI();
+  } finally { el.disabled = false; }
+};
+ACTIONS['remove-schedule-item'] = async (el)=>{
+  const scope = el.dataset.scope, date = el.dataset.date, idx = Number(el.dataset.idx);
+  el.disabled = true;
+  try{
+    await removeScheduleItemAt(scope, date, idx);
+    refreshScheduleUI();
+  } finally { el.disabled = false; }
+};
+ACTIONS['modal-close'] = ()=>closeModal();
+ACTIONS['modal-bg'] = ()=>closeModal();
+ACTIONS['save-day-detail'] = async (el)=>{
+  const csc = el.dataset.csc, date = el.dataset.date, isAdmin = el.dataset.admin==='1', canEditTarget = el.dataset.canEditTarget==='1';
+  const payload = { date };
+  if(canEditTarget){
+    const t = document.getElementById('day-target').value;
+    payload.apptTarget = t===''?null:num(t,0);
+    payload.targetSetAt = new Date().toISOString();
+  }
+  if(isAdmin){
+    const a = document.getElementById('day-actual').value;
+    payload.apptActual = a===''?null:num(a,0);
+    payload.actualSetAt = new Date().toISOString();
+  }
+  el.disabled = true;
+  try{ await upsert(refDaily(csc,date), payload); closeModal(); }
+  finally{ el.disabled = false; }
+};
+
+/* =========================================================
+   12. WEEKLY TAB
+========================================================= */
+function loadWeeklyTab(p, isAdmin){
+  clearSubs();
+  const weekStr = toISO(S.weekCursor);
+  S.cache.weekTabDoc = {};
+  addSub(refWeekly(p.id, weekStr).onSnapshot(snap=>{
+    S.cache.weekTabDoc = snap.exists ? snap.data() : {};
+    renderWeeklyContent(p, isAdmin);
+  }, ()=>{}));
+  renderWeeklyContent(p, isAdmin);
+}
+ACTIONS['week-prev'] = ()=>{ S.weekCursor = addDays(S.weekCursor,-7); renderCurrent(); };
+ACTIONS['week-next'] = ()=>{ S.weekCursor = addDays(S.weekCursor,7); renderCurrent(); };
+ACTIONS['week-this'] = ()=>{ S.weekCursor = startOfWeekMonday(todayDate()); renderCurrent(); };
+
+function renderWeeklyContent(p, isAdmin){
+  const weekStr = toISO(S.weekCursor);
+  const wd = S.cache.weekTabDoc || {};
+  const target = wd.tuTarget ?? null, actual = wd.tuActual ?? null;
+  const p100 = pct(actual, target);
+  const isCurrentOrFuture = S.weekCursor >= startOfWeekMonday(todayDate());
+  const canSeeTargetSection = canEditTargetFor(p);
+  const targetInputEditable = isAdmin || (S.role==='csc' && (target===null || target===undefined) && isCurrentOrFuture);
+
+  contentEl().innerHTML =
+    '<div class="card">'+
+      '<div class="spread" style="margin-bottom:4px;">'+
+        '<button class="iconbtn" data-act="week-prev">←</button>'+
+        '<div style="text-align:center;">'+
+          '<div class="section-title" style="margin:0;">Week '+isoWeekOfYear(S.weekCursor)+'</div>'+
+          '<div class="hint">'+weekRangeLabel(S.weekCursor)+'</div>'+
+        '</div>'+
+        '<button class="iconbtn" data-act="week-next">→</button>'+
+      '</div>'+
+      '<div class="row" style="justify-content:center;margin-bottom:14px;"><button class="btn-ghost" data-act="week-this">Back to this week</button></div>'+
+
+      '<div class="grid cols-4" style="margin-bottom:16px;">'+
+        '<div class="stat-tile"><div class="label">TU Target</div><div class="value">'+(target??'—')+'</div></div>'+
+        '<div class="stat-tile"><div class="label">Actual TU</div><div class="value">'+(actual??'—')+'</div></div>'+
+        '<div class="stat-tile"><div class="label">Result</div><div class="value">'+((target!=null&&actual!=null)?((actual-target>=0?'+':'')+(actual-target)):'—')+'</div></div>'+
+        '<div class="stat-tile"><div class="label">Achievement</div><div class="value">'+(p100!=null?p100+'%':'—')+'</div></div>'+
+      '</div>'+
+      '<div class="progress-track" style="margin-bottom:6px;"><div class="progress-fill '+(p100!=null&&p100>=100?'success':p100!=null&&p100<60?'warning':'')+'" style="width:'+Math.min(100,p100||0)+'%;"></div></div>'+
+      '<p class="hint" style="margin:0 0 16px;">'+(target!=null && actual!=null ? (actual>=target ? '🎉 This week\'s target achieved!' : (target-actual)+' TU short of this week\'s target.') : 'Data not complete yet')+'</p>'+
+
+      (canSeeTargetSection ? (
+      '<div class="divider"></div>'+
+      '<div class="grid cols-2">'+
+        '<div>'+
+          '<div class="card-title">🎯 Monday: Set This Week\'s TU Target</div>'+
+          (targetInputEditable ? (
+            '<div class="row" style="align-items:flex-end;gap:8px;">'+
+              '<div class="field" style="flex:1;"><label>TU target</label><input type="number" min="0" id="wk-target" value="'+(target??'')+'"></div>'+
+              '<button class="btn sm" data-act="save-wk-target" data-csc="'+p.id+'" data-week="'+weekStr+'">Save</button>'+
+            '</div>'
+          ) : '<p class="hint">This week\'s target is set to <b>'+target+'</b>. Contact Admin to change it.</p>')+
+        '</div>'+
+        (isAdmin ? (
+        '<div>'+
+          '<div class="card-title">📈 Update Actual TU (Admin)</div>'+
+          '<div class="row" style="align-items:flex-end;gap:8px;">'+
+            '<div class="field" style="flex:1;"><label>Actual TU</label><input type="number" min="0" id="wk-actual" value="'+(actual??'')+'"></div>'+
+            '<button class="btn sm secondary" data-act="save-wk-actual" data-csc="'+p.id+'" data-week="'+weekStr+'">Save</button>'+
+          '</div>'+
+        '</div>') : '')+
+      '</div>') : '')+
+    '</div>';
+}
+ACTIONS['save-wk-target'] = async (el)=>{
+  const csc = el.dataset.csc, week = el.dataset.week;
+  const v = document.getElementById('wk-target').value;
+  el.disabled = true;
+  try{ await upsert(refWeekly(csc,week), { weekStart: week, tuTarget: v===''?null:num(v,0), targetSetAt: new Date().toISOString() }); }
+  finally{ el.disabled = false; }
+};
+ACTIONS['save-wk-actual'] = async (el)=>{
+  const csc = el.dataset.csc, week = el.dataset.week;
+  const v = document.getElementById('wk-actual').value;
+  el.disabled = true;
+  try{ await upsert(refWeekly(csc,week), { weekStart: week, tuActual: v===''?null:num(v,0), actualSetAt: new Date().toISOString() }); }
+  finally{ el.disabled = false; }
+};
+
+/* =========================================================
+   12b. MONTHLY TAB — Jan..Dec results for one year
+========================================================= */
+function loadMonthlyTab(p, isAdmin){
+  clearSubs();
+  renderMonthlyContent(p, isAdmin, null);
+  loadMonthlyHistory(p.id, S.monthlyYear).then(rows=>{
+    renderMonthlyContent(p, isAdmin, rows);
+  }).catch(()=>{ renderMonthlyContent(p, isAdmin, []); });
+}
+ACTIONS['monthly-prev-year'] = ()=>{ S.monthlyYear -= 1; renderCurrent(); };
+ACTIONS['monthly-next-year'] = ()=>{ S.monthlyYear += 1; renderCurrent(); };
+ACTIONS['monthly-this-year'] = ()=>{ S.monthlyYear = todayDate().getFullYear(); renderCurrent(); };
+
+async function loadMonthlyHistory(cscId, year){
+  const rows = Array.from({length:12}, (_,i)=>({ month:i, apptTarget:null, apptActual:null, tuTarget:null, tuActual:null }));
+  try{
+    const snap = await colMonthly(cscId).get();
+    snap.docs.forEach(d=>{
+      if(!d.id.startsWith(year+'-')) return;
+      const m = Number(d.id.slice(5,7)) - 1;
+      if(m<0||m>11) return;
+      const dd = d.data();
+      rows[m].apptTarget = dd.apptTarget ?? null;
+      rows[m].apptActual = dd.apptActual ?? null;
+      rows[m].tuTarget = dd.tuTarget ?? null;
+      rows[m].tuActual = dd.tuActual ?? null;
+    });
+  }catch(e){}
+  return rows;
+}
+
+function renderMonthlyContent(p, isAdmin, rows){
+  const year = S.monthlyYear;
+  const canEditTarget = canEditTargetFor(p);
+  if(!rows){
+    contentEl().innerHTML = '<div class="card"><div class="empty-state">Loading…</div></div>';
+    return;
+  }
+  const yearApptActual = rows.reduce((s,r)=>s+num(r.apptActual,0),0);
+  const yearTuActual = rows.reduce((s,r)=>s+num(r.tuActual,0),0);
+  const body = rows.map(r=>{
+    const apptPct = r.apptActual!=null ? pct(r.apptActual, r.apptTarget) : null;
+    const tuP = r.tuActual!=null ? pct(r.tuActual, r.tuTarget) : null;
+    const hasData = r.apptTarget!=null||r.apptActual!=null||r.tuTarget!=null||r.tuActual!=null;
+    const monthStr = year+'-'+pad2(r.month+1);
+    return '<tr class="row-clickable" data-act="open-month" data-month="'+monthStr+'" data-csc="'+p.id+'" data-admin="'+(isAdmin?1:0)+'" data-can-edit-target="'+(canEditTarget?1:0)+'"'+(!hasData?' style="opacity:.6;"':'')+'>'+
+      '<td><b>'+MONTH_NAMES[r.month]+'</b></td>'+
+      '<td>'+(r.apptActual??'—')+' / '+(r.apptTarget??'—')+'</td>'+
+      '<td>'+(apptPct!=null?apptPct+'%':'—')+'</td>'+
+      '<td>'+(r.tuActual??'—')+' / '+(r.tuTarget??'—')+'</td>'+
+      '<td>'+(tuP!=null?tuP+'%':'—')+'</td>'+
+    '</tr>';
+  }).join('');
+
+  contentEl().innerHTML =
+    '<div class="card">'+
+      '<div class="spread" style="margin-bottom:14px;">'+
+        '<button class="iconbtn" data-act="monthly-prev-year">←</button>'+
+        '<div style="text-align:center;"><div class="section-title" style="margin:0;">'+year+'</div><div class="hint">Monthly results</div></div>'+
+        '<button class="iconbtn" data-act="monthly-next-year">→</button>'+
+      '</div>'+
+      '<div class="row" style="justify-content:center;margin-bottom:14px;"><button class="btn-ghost" data-act="monthly-this-year">Back to this year</button></div>'+
+      '<div class="grid cols-2" style="margin-bottom:16px;">'+
+        '<div class="stat-tile"><div class="label">📈 Total APPT this year</div><div class="value">'+yearApptActual+'</div></div>'+
+        '<div class="stat-tile"><div class="label">🎯 Total TU this year</div><div class="value">'+yearTuActual+'</div></div>'+
+      '</div>'+
+      '<p class="hint" style="margin:0 0 8px;">Click a month to fill in its target and actual figures.</p>'+
+      '<div class="table-wrap"><table><thead><tr><th>Month</th><th>APPT (actual/target)</th><th>APPT %</th><th>TU (actual/target)</th><th>TU %</th></tr></thead>'+
+      '<tbody>'+body+'</tbody></table></div>'+
+    '</div>';
+}
+
+ACTIONS['open-month'] = async (el)=>{
+  const csc = el.dataset.csc, monthStr = el.dataset.month, isAdmin = el.dataset.admin==='1', canEditTarget = el.dataset.canEditTarget==='1';
+  let data = {};
+  try{ const snap = await refMonthly(csc, monthStr).get(); data = snap.exists ? snap.data() : {}; }catch(e){}
+  const mIdx = Number(monthStr.slice(5,7)) - 1;
+  const label = MONTH_NAMES[mIdx]+' '+monthStr.slice(0,4);
+  const notes = [];
+  if(!canEditTarget) notes.push('Only '+esc(findProfile(csc).name)+' or Admin can set the target.');
+  if(!isAdmin) notes.push('The actual figure can only be updated by Admin.');
+  openModal(
+    '<h3>'+label+'</h3>'+
+    '<p class="section-sub">'+esc(findProfile(csc).name)+'</p>'+
+    '<div class="grid cols-2" style="margin:14px 0;">'+
+      '<div class="field"><label>🎯 APPT Target</label><input type="number" min="0" id="month-appt-target" value="'+(data.apptTarget??'')+'" '+(canEditTarget?'':'disabled')+'></div>'+
+      '<div class="field"><label>✅ Actual APPT</label><input type="number" min="0" id="month-appt-actual" value="'+(data.apptActual??'')+'" '+(isAdmin?'':'disabled')+'></div>'+
+      '<div class="field"><label>🎯 TU Target</label><input type="number" min="0" id="month-tu-target" value="'+(data.tuTarget??'')+'" '+(canEditTarget?'':'disabled')+'></div>'+
+      '<div class="field"><label>✅ Actual TU</label><input type="number" min="0" id="month-tu-actual" value="'+(data.tuActual??'')+'" '+(isAdmin?'':'disabled')+'></div>'+
+    '</div>'+
+    (notes.length ? '<p class="hint">'+notes.join(' ')+'</p>' : '')+
+    '<div class="row" style="justify-content:flex-end;gap:8px;">'+
+      '<button class="btn secondary" data-act="modal-close">Cancel</button>'+
+      (canEditTarget || isAdmin ? '<button class="btn" data-act="save-month-detail" data-csc="'+csc+'" data-month="'+monthStr+'" data-admin="'+(isAdmin?1:0)+'" data-can-edit-target="'+(canEditTarget?1:0)+'">Save</button>' : '')+
+    '</div>'
+  );
+};
+ACTIONS['save-month-detail'] = async (el)=>{
+  const csc = el.dataset.csc, monthStr = el.dataset.month, isAdmin = el.dataset.admin==='1', canEditTarget = el.dataset.canEditTarget==='1';
+  const payload = {};
+  if(canEditTarget){
+    const at = document.getElementById('month-appt-target').value;
+    const tt = document.getElementById('month-tu-target').value;
+    payload.apptTarget = at===''?null:num(at,0);
+    payload.tuTarget = tt===''?null:num(tt,0);
+    payload.targetSetAt = new Date().toISOString();
+  }
+  if(isAdmin){
+    const aa = document.getElementById('month-appt-actual').value;
+    const ta = document.getElementById('month-tu-actual').value;
+    payload.apptActual = aa===''?null:num(aa,0);
+    payload.tuActual = ta===''?null:num(ta,0);
+    payload.actualSetAt = new Date().toISOString();
+  }
+  el.disabled = true;
+  try{
+    await upsert(refMonthly(csc, monthStr), payload);
+    closeModal();
+    loadMonthlyTab(findProfile(csc), S.role==='admin');
+  } finally { el.disabled = false; }
+};
+
+/* =========================================================
+   12c. HISTORY TAB — Admin-only day-by-day log
+========================================================= */
+function loadHistoryTab(p, isAdmin){
+  if(!isAdmin){ S.tab='overview'; return loadOverviewTab(p, isAdmin); }
+  clearSubs();
+  const year = S.historyCursor.getFullYear(), month = S.historyCursor.getMonth();
+  const startStr = toISO(new Date(year,month,1));
+  const endStr = toISO(new Date(year,month+1,0));
+  S.cache.historyDocs = {};
+  addSub(colDaily(p.id).where('date','>=',startStr).where('date','<=',endStr).orderBy('date').onSnapshot(snap=>{
+    const map = {}; snap.docs.forEach(d=>{ map[d.id] = d.data(); });
+    S.cache.historyDocs = map;
+    renderHistoryContent(p, isAdmin);
+  }, ()=>{ renderHistoryContent(p, isAdmin); }));
+  renderHistoryContent(p, isAdmin);
+}
+ACTIONS['history-prev'] = ()=>{ S.historyCursor = addMonths(S.historyCursor,-1); renderCurrent(); };
+ACTIONS['history-next'] = ()=>{ S.historyCursor = addMonths(S.historyCursor,1); renderCurrent(); };
+ACTIONS['history-today'] = ()=>{ S.historyCursor = todayDate(); renderCurrent(); };
+
+function renderHistoryContent(p, isAdmin){
+  const year = S.historyCursor.getFullYear(), month = S.historyCursor.getMonth();
+  const docs = S.cache.historyDocs || {};
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const canEditTarget = canEditTargetFor(p);
+  const rows = [];
+  for(let day=1; day<=daysInMonth; day++){
+    const d = new Date(year, month, day);
+    const dateStr = toISO(d);
+    const doc = docs[dateStr];
+    if(!doc || (doc.apptTarget==null && doc.apptActual==null)) continue;
+    const apptPct = doc.apptActual!=null ? pct(doc.apptActual, doc.apptTarget) : null;
+    rows.push(
+      '<tr class="row-clickable" data-act="open-day" data-date="'+dateStr+'" data-csc="'+p.id+'" data-admin="1" data-can-edit-target="'+(canEditTarget?1:0)+'">'+
+        '<td><b>'+MONTH_NAMES[month].slice(0,3)+' '+day+'</b> <span class="hint">('+WEEKDAYS_SHORT_SUN_FIRST[d.getDay()]+')</span></td>'+
+        '<td>'+(doc.apptTarget??'—')+'</td>'+
+        '<td>'+(doc.apptActual??'—')+'</td>'+
+        '<td>'+(apptPct!=null?apptPct+'%':'—')+'</td>'+
+      '</tr>'
+    );
+  }
+  const body = rows.length ? rows.join('') : '<tr><td colspan="4"><div class="empty-state">No daily entries recorded for '+esc(monthTitle(S.historyCursor))+' yet.</div></td></tr>';
+
+  contentEl().innerHTML =
+    '<div class="card">'+
+      '<div class="spread" style="margin-bottom:14px;">'+
+        '<button class="iconbtn" data-act="history-prev">←</button>'+
+        '<div style="text-align:center;"><div class="section-title" style="margin:0;">'+monthTitle(S.historyCursor)+'</div><div class="hint">Daily history · Admin only</div></div>'+
+        '<button class="iconbtn" data-act="history-next">→</button>'+
+      '</div>'+
+      '<div class="row" style="justify-content:center;margin-bottom:14px;"><button class="btn-ghost" data-act="history-today">Back to this month</button></div>'+
+      '<p class="hint" style="margin:0 0 8px;">Click a day to edit its target or actual. Days with nothing entered are hidden here.</p>'+
+      '<div class="table-wrap"><table><thead><tr><th>Date</th><th>APPT Target</th><th>APPT Actual</th><th>APPT %</th></tr></thead>'+
+      '<tbody>'+body+'</tbody></table></div>'+
+    '</div>';
+}
+
+/* =========================================================
+   13. OUTLET TAB
+========================================================= */
+function loadOutletTab(p, isAdmin){
+  clearSubs();
+  const weekStr = toISO(S.weekCursor);
+  S.cache.outletWeekDoc = {};
+  addSub(refWeekly(p.id, weekStr).onSnapshot(snap=>{
+    S.cache.outletWeekDoc = snap.exists ? snap.data() : {};
+    renderOutletContent(p, isAdmin);
+  }, ()=>{}));
+  renderOutletContent(p, isAdmin);
+}
+function renderOutletContent(p, isAdmin){
+  const weekStr = toISO(S.weekCursor);
+  const wd = S.cache.outletWeekDoc || {};
+  const outlets = wd.outlets || {};
+  const assigned = p.outlets || [];
+  const canEditTarget = canEditTargetFor(p);
+
+  let body;
+  if(!assigned.length){
+    body = '<div class="empty-state">🏢 No outlet assigned yet<br><span class="hint">Ask Admin to assign one in the control panel.</span></div>';
+  } else {
+    body = '<div class="grid cols-2">'+assigned.map(oid=>{
+      const od = outlets[oid] || {};
+      const target = od.tuTarget ?? null, actual = od.tuActual ?? null;
+      const p100 = pct(actual, target);
+      return '<div class="card pad-sm">'+
+        '<div class="spread" style="margin-bottom:10px;"><span class="section-title" style="font-size:16px;">🏢 '+esc(outletName(oid))+'</span>'+(p100!=null?'<span class="pill '+(p100>=100?'success':p100<60?'danger':'warning')+'">'+p100+'%</span>':'')+'</div>'+
+        '<div class="progress-track" style="margin-bottom:10px;"><div class="progress-fill '+(p100!=null&&p100>=100?'success':'')+'" style="width:'+Math.min(100,p100||0)+'%;"></div></div>'+
+        '<div class="grid cols-2" style="margin-bottom:10px;">'+
+          '<div class="field"><label>🎯 Planned TU</label><input type="number" min="0" class="cell-input" id="ot-target-'+oid+'" value="'+(target??'')+'" style="width:100%;" '+(canEditTarget?'':'disabled')+'></div>'+
+          '<div class="field"><label>✅ Actual TU</label><input type="number" min="0" class="cell-input" id="ot-actual-'+oid+'" value="'+(actual??'')+'" style="width:100%;" '+(isAdmin?'':'disabled')+'></div>'+
+        '</div>'+
+        '<div class="hint" style="margin-bottom:8px;">'+(target!=null&&actual!=null ? (actual>=target?'✅ Target met +'+(actual-target):(target-actual)+' TU short') : 'Data incomplete')+'</div>'+
+        (canEditTarget || isAdmin ? '<button class="btn sm" data-act="save-outlet-row" data-csc="'+p.id+'" data-week="'+weekStr+'" data-outlet="'+oid+'" data-admin="'+(isAdmin?1:0)+'" data-can-edit-target="'+(canEditTarget?1:0)+'">Save</button>' : '')+
+      '</div>';
+    }).join('')+'</div>';
+  }
+
+  contentEl().innerHTML =
+    '<div class="card">'+
+      '<div class="spread" style="margin-bottom:14px;">'+
+        '<button class="iconbtn" data-act="week-prev">←</button>'+
+        '<div style="text-align:center;"><div class="section-title" style="margin:0;">Outlet Weekly Performance</div><div class="hint">'+weekRangeLabel(S.weekCursor)+'</div></div>'+
+        '<button class="iconbtn" data-act="week-next">→</button>'+
+      '</div>'+
+      body+
+    '</div>';
+}
+ACTIONS['save-outlet-row'] = async (el)=>{
+  const csc = el.dataset.csc, week = el.dataset.week, oid = el.dataset.outlet, isAdmin = el.dataset.admin==='1', canEditTarget = el.dataset.canEditTarget==='1';
+  const payload = { weekStart: week, outlets: {} };
+  payload.outlets[oid] = {};
+  if(canEditTarget){
+    const tEl = document.getElementById('ot-target-'+oid);
+    const t = tEl ? tEl.value : '';
+    payload.outlets[oid].tuTarget = t===''?null:num(t,0);
+  }
+  if(isAdmin){
+    const aEl = document.getElementById('ot-actual-'+oid);
+    payload.outlets[oid].tuActual = aEl.value===''?null:num(aEl.value,0);
+  }
+  el.disabled = true;
+  try{ await upsert(refWeekly(csc,week), payload); }
+  finally{ el.disabled = false; }
+};
+
+/* =========================================================
+   14. ACHIEVEMENTS TAB
+========================================================= */
+function renderAchievementsTab(p, isAdmin){
+  contentEl().innerHTML =
+    '<div class="card">'+
+      '<div class="card-title">Achievements Overview</div>'+
+      '<div class="ach-row" style="margin-bottom:18px;">'+
+        '<div class="ach-box"><span class="emo">🏆</span><span class="cnt">'+num(p.trophies,0)+'</span>'+
+          (isAdmin ? ('<button class="iconbtn" data-act="adjust-ach" data-csc="'+p.id+'" data-field="trophies" data-delta="-1">−</button><button class="iconbtn" data-act="adjust-ach" data-csc="'+p.id+'" data-field="trophies" data-delta="1">+</button>') : '')+
+        '</div>'+
+        '<div class="ach-box"><span class="emo">🤎</span><span class="cnt">'+num(p.hearts,0)+'</span>'+
+          (isAdmin ? ('<button class="iconbtn" data-act="adjust-ach" data-csc="'+p.id+'" data-field="hearts" data-delta="-1">−</button><button class="iconbtn" data-act="adjust-ach" data-csc="'+p.id+'" data-field="hearts" data-delta="1">+</button>') : '')+
+        '</div>'+
+      '</div>'+
+      '<div class="grid cols-2">'+
+        '<div class="stat-tile"><div class="label">🏆 Champion Trophy</div><div class="sub">Awarded manually by Admin to recognize a top-performing CSC.</div></div>'+
+        '<div class="stat-tile"><div class="label">🤎 20+ TU Achievement</div><div class="sub">Awarded manually by Admin when a CSC\'s Actual TU reaches 20+ in a single week.</div></div>'+
+      '</div>'+
+      (!isAdmin ? '<p class="hint" style="margin-top:14px;">Achievements can only be added or removed by Admin.</p>' : '')+
+    '</div>';
+}
+ACTIONS['adjust-ach'] = async (el)=>{
+  const id = el.dataset.csc, field = el.dataset.field, delta = Number(el.dataset.delta);
+  const p = findProfile(id); if(!p) return;
+  const next = Math.max(0, num(p[field],0) + delta);
+  const d = {}; d[field] = next;
+  await upsert(colProfiles().doc(id), d);
+};
+
+/* =========================================================
+   15. ADMIN NAV + SHARED AGGREGATE LOADER
+========================================================= */
+function adminNavHtml(active){
+  const tabs = [['admin-home','🏠','Team Overview'],['admin-panel','⚙️','Control Panel']];
+  return '<div class="nav">'+tabs.map(([id,ic,label])=>
+    '<div class="navlink admin'+(active===id?' active':'')+'" data-act="admin-tab" data-tab="'+id+'">'+ic+' '+label+'</div>'
+  ).join('')+'</div>';
+}
+ACTIONS['admin-tab'] = (el)=>{ S.tab = el.dataset.tab; renderCurrent(); };
+
+function subscribeTodayWeekForAll(onUpdate){
+  const todayStr = toISO(todayDate());
+  const weekStr = toISO(startOfWeekMonday(todayDate()));
+  S.cache.homeToday = {}; S.cache.homeWeek = {};
+  activeProfiles().forEach(p=>{
+    addSub(refDaily(p.id, todayStr).onSnapshot(snap=>{ S.cache.homeToday[p.id] = snap.exists?snap.data():{}; onUpdate(); }, ()=>{ onUpdate(); }));
+    addSub(refWeekly(p.id, weekStr).onSnapshot(snap=>{ S.cache.homeWeek[p.id] = snap.exists?snap.data():{}; onUpdate(); }, ()=>{ onUpdate(); }));
+  });
+  return { todayStr, weekStr };
+}
+
+/* =========================================================
+   16. ADMIN HOME (TEAM OVERVIEW)
+========================================================= */
+function renderAdminHome(){
+  appEl.innerHTML = topbarHtml({ title:'Team Overview', navHtml: adminNavHtml('admin-home') }) +
+    '<div id="admin-home-content"><div class="empty-state">Loading…</div></div>';
+  loadAdminHome();
+}
+
+function renderCscTeamView(){
+  appEl.innerHTML = topbarHtml({
+    title: 'Team Overview',
+  }) +
+    '<p class="hint" style="margin:-6px 0 14px;">Click anyone\'s card to view and update their targets. Only Admin can edit actual results and achievements.</p>'+
+    '<div id="admin-home-content"><div class="empty-state">Loading…</div></div>';
+  loadAdminHome();
+}
+ACTIONS['go-team-view'] = ()=>{ S.cscId = null; S.tab = 'team'; renderCurrent(); };
+function loadAdminHome(){
+  S.cache.homeAgg = {};
+  const {todayStr, weekStr} = subscribeTodayWeekForAll(()=>renderAdminHomeContent(todayStr, weekStr));
+  Promise.all(activeProfiles().map(p=>loadAggregates(p.id).then(agg=>{ S.cache.homeAgg[p.id]=agg; })))
+    .then(()=>renderAdminHomeContent(todayStr, weekStr)).catch(()=>{});
+  renderAdminHomeContent(todayStr, weekStr);
+}
+
+function renderAdminHomeContent(todayStr, weekStr){
+  const el = document.getElementById('admin-home-content');
+  if(!el) return;
+  const profiles = activeProfiles();
+  let sumApptT=0, sumApptA=0, sumTuT=0, sumTuA=0;
+  profiles.forEach(p=>{
+    const td = (S.cache.homeToday||{})[p.id] || {};
+    const wd = (S.cache.homeWeek||{})[p.id] || {};
+    sumApptT += num(td.apptTarget,0); sumApptA += num(td.apptActual,0);
+    sumTuT += num(wd.tuTarget,0); sumTuA += num(wd.tuActual,0);
+  });
+  const apptPct = pct(sumApptA, sumApptT);
+  const tuPct = pct(sumTuA, sumTuT);
+  const tuRemain = sumTuT - sumTuA;
+
+  const cards = profiles.length ? profiles.map(p=>{
+    const td = (S.cache.homeToday||{})[p.id] || {};
+    const wd = (S.cache.homeWeek||{})[p.id] || {};
+    const avatarHtml = p.photoUrl
+      ? '<img class="avatar" src="'+esc(p.photoUrl)+'" alt="">'
+      : '<div class="avatar" style="background:'+colorForName(p.name)+';">'+esc(initials(p.name))+'</div>';
+    return '<div class="profile-card" data-act="open-profile" data-id="'+p.id+'">'+
+      '<div class="row" style="gap:12px;">'+avatarHtml+
+        '<div style="flex:1;min-width:0;">'+
+          '<div style="font-family:\'Baloo 2\',sans-serif;font-weight:700;font-size:16px;">'+esc(p.name)+'</div>'+
+          '<div class="badges">'+badgesHtml(p)+'</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="grid cols-2">'+
+        '<div class="mini-stat">Today\'s APPT<br><span class="mini-val">'+num(td.apptActual,0)+' / '+(td.apptTarget??'—')+'</span></div>'+
+        '<div class="mini-stat">This Week\'s TU<br><span class="mini-val">'+num(wd.tuActual,0)+' / '+(wd.tuTarget??'—')+'</span></div>'+
+      '</div>'+
+      '<div class="row wrap" style="gap:6px;">'+
+        (p.outlets&&p.outlets.length ? p.outlets.map(o=>'<span class="tag">🏢 '+esc(outletName(o))+'</span>').join('') : '<span class="hint">No outlet assigned</span>')+
+      '</div>'+
+    '</div>';
+  }).join('') : '<div class="empty-state">No CSC profiles yet — add one from the Control Panel.</div>';
+
+  el.innerHTML =
+    '<div class="stack">'+
+      '<div>'+
+        '<h2 class="section-title">📊 Today\'s Team Performance</h2>'+
+        '<div class="grid cols-4">'+
+          '<div class="stat-tile hero"><div class="label">Team APPT Target</div><div class="value">'+sumApptT+'</div></div>'+
+          '<div class="stat-tile"><div class="label">Actual APPT</div><div class="value">'+sumApptA+'</div></div>'+
+          '<div class="stat-tile"><div class="label">Achievement</div><div class="value">'+(apptPct!=null?apptPct+'%':'—')+'</div></div>'+
+          '<div class="stat-tile"><div class="label">CSC Count</div><div class="value">'+profiles.length+'</div></div>'+
+        '</div>'+
+      '</div>'+
+      '<div>'+
+        '<h2 class="section-title">📈 This Week\'s Team Performance</h2>'+
+        '<div class="grid cols-4">'+
+          '<div class="stat-tile hero"><div class="label">TU Target</div><div class="value">'+sumTuT+'</div></div>'+
+          '<div class="stat-tile"><div class="label">Actual TU</div><div class="value">'+sumTuA+'</div></div>'+
+          '<div class="stat-tile"><div class="label">'+(tuRemain>0?'Short by':'Over by')+'</div><div class="value">'+Math.abs(tuRemain)+'</div></div>'+
+          '<div class="stat-tile"><div class="label">Achievement</div><div class="value">'+(tuPct!=null?tuPct+'%':'—')+'</div></div>'+
+        '</div>'+
+      '</div>'+
+      '<div>'+
+        '<div class="spread" style="margin-bottom:10px;"><h2 class="section-title" style="margin:0;">🙋 Team Members</h2><span class="hint">Click a card to view the full profile</span></div>'+
+        '<div class="grid cols-3">'+cards+'</div>'+
+      '</div>'+
+    '</div>';
+}
+
+/* =========================================================
+   17. ADMIN CONTROL PANEL
+========================================================= */
+function renderAdminPanel(){
+  appEl.innerHTML = topbarHtml({ title:'Admin Control Panel', navHtml: adminNavHtml('admin-panel') }) +
+    '<div id="admin-panel-content"><div class="empty-state">Loading…</div></div>';
+  loadAdminPanel();
+}
+function loadAdminPanel(){
+  const {todayStr, weekStr} = subscribeTodayWeekForAll(()=>renderAdminPanelContent(todayStr, weekStr));
+  renderAdminPanelContent(todayStr, weekStr);
+}
+
+function renderAdminPanelContent(todayStr, weekStr){
+  const el = document.getElementById('admin-panel-content');
+  if(!el) return;
+  const profiles = activeProfiles();
+
+  const quickRows = profiles.map(p=>{
+    const td=(S.cache.homeToday||{})[p.id]||{}, wd=(S.cache.homeWeek||{})[p.id]||{};
+    return '<tr>'+
+      '<td><b>'+esc(p.name)+'</b></td>'+
+      '<td>'+(td.apptTarget??'—')+'</td>'+
+      '<td><input class="cell-input" type="number" min="0" id="qu-actual-'+p.id+'" value="'+(td.apptActual??'')+'"></td>'+
+      '<td><input class="cell-input" type="number" min="0" id="qu-tu-'+p.id+'" value="'+(wd.tuActual??'')+'"></td>'+
+      '<td><button class="btn sm" data-act="quick-save" data-csc="'+p.id+'" data-date="'+todayStr+'" data-week="'+weekStr+'">✓ Save</button></td>'+
+    '</tr>';
+  }).join('');
+
+  const profileRows = S.profiles.slice().sort((a,b)=>(a.order||0)-(b.order||0)).map(p=>{
+    return '<tr'+(p.active===false?' style="opacity:.5;"':'')+'>'+
+      '<td>'+esc(p.name)+(p.active===false?' <span class="pill neutral">Inactive</span>':'')+'</td>'+
+      '<td>'+(p.outlets&&p.outlets.length?p.outlets.map(o=>esc(outletName(o))).join(', '):'—')+'</td>'+
+      '<td>🏆'+num(p.trophies,0)+' 🤎'+num(p.hearts,0)+'</td>'+
+      '<td><button class="btn sm secondary" data-act="edit-profile" data-id="'+p.id+'">Edit</button></td>'+
+    '</tr>';
+  }).join('');
+
+  const outletRows = S.outlets.map(o=>{
+    return '<tr><td>'+esc(o.name)+'</td><td><button class="btn sm danger" data-act="delete-outlet" data-id="'+o.id+'">Remove</button></td></tr>';
+  }).join('') || '<tr><td colspan="2" class="hint">No outlets yet</td></tr>';
+
+  el.innerHTML = '<div class="stack">'+
+
+    '<div class="card">'+
+      '<div class="card-title">⚡ Quick Admin Update</div>'+
+      '<div class="table-wrap"><table><thead><tr><th>CSC</th><th>APPT Target</th><th>Actual APPT</th><th>This Week TU</th><th></th></tr></thead>'+
+      '<tbody>'+(quickRows||'<tr><td colspan="5" class="hint">No CSC profiles yet</td></tr>')+'</tbody></table></div>'+
+    '</div>'+
+
+    '<div class="card">'+
+      '<div class="spread" style="margin-bottom:10px;"><div class="card-title" style="margin:0;">🙋 CSC Profile Management</div><button class="btn sm" data-act="edit-profile" data-id="">+ Add CSC</button></div>'+
+      '<div class="table-wrap"><table><thead><tr><th>Name</th><th>Outlet(s)</th><th>Achievements</th><th></th></tr></thead><tbody>'+profileRows+'</tbody></table></div>'+
+    '</div>'+
+
+    '<div class="card">'+
+      '<div class="spread" style="margin-bottom:10px;"><div class="card-title" style="margin:0;">🏢 Outlet Management</div></div>'+
+      '<div class="row" style="margin-bottom:12px;">'+
+        '<input class="cell-input" style="width:180px;" id="new-outlet-name" placeholder="New outlet name, e.g. BM">'+
+        '<button class="btn sm" data-act="add-outlet">+ Add Outlet</button>'+
+      '</div>'+
+      '<div class="table-wrap"><table><thead><tr><th>Outlet</th><th></th></tr></thead><tbody>'+outletRows+'</tbody></table></div>'+
+    '</div>'+
+
+    '<div class="card">'+
+      '<div class="card-title">🔒 Security</div>'+
+      '<button class="btn secondary" data-act="change-admin-pw">Change Admin Password</button>'+
+    '</div>'+
+
+  '</div>';
+}
+
+ACTIONS['quick-save'] = async (el)=>{
+  const csc=el.dataset.csc, date=el.dataset.date, week=el.dataset.week;
+  const actual = document.getElementById('qu-actual-'+csc).value;
+  const tu = document.getElementById('qu-tu-'+csc).value;
+  el.disabled = true;
+  try{
+    await Promise.all([
+      upsert(refDaily(csc,date), { date, apptActual: actual===''?null:num(actual,0), actualSetAt:new Date().toISOString() }),
+      upsert(refWeekly(csc,week), { weekStart: week, tuActual: tu===''?null:num(tu,0), actualSetAt:new Date().toISOString() }),
+    ]);
+    el.textContent = '✓ Saved';
+    setTimeout(()=>{ el.textContent = '✓ Save'; }, 1200);
+  } finally { el.disabled = false; }
+};
+
+ACTIONS['change-admin-pw'] = ()=>{
+  openModal(
+    '<h3>Change Admin Password</h3>'+
+    '<form data-act-submit="submit-change-pw" class="stack" style="margin-top:10px;">'+
+      '<div class="field"><label>New password</label><input type="password" id="new-pw" minlength="4" required></div>'+
+      '<div class="field"><label>Confirm password</label><input type="password" id="new-pw2" minlength="4" required></div>'+
+      '<div id="pw-err" class="hint" style="color:var(--danger);"></div>'+
+      '<div class="row" style="justify-content:flex-end;gap:8px;"><button type="button" class="btn secondary" data-act="modal-close">Cancel</button><button class="btn" type="submit">Update Password</button></div>'+
+    '</form>'
+  );
+};
+ACTIONS['submit-change-pw'] = async ()=>{
+  const a = document.getElementById('new-pw').value, b = document.getElementById('new-pw2').value;
+  const errEl = document.getElementById('pw-err');
+  if(a!==b){ errEl.textContent='Passwords don\'t match'; return; }
+  const hash = await sha256Hex(a);
+  await upsert(refConfig(), { adminPasswordHash: hash });
+  closeModal();
+};
+
+/* ---- outlet management ---- */
+ACTIONS['add-outlet'] = async ()=>{
+  const inputEl = document.getElementById('new-outlet-name');
+  const name = inputEl.value.trim();
+  if(!name) return;
+  let id = slugify(name);
+  let snap = await colOutlets().doc(id).get();
+  let n = 2;
+  while(snap.exists){ id = slugify(name)+'-'+n; snap = await colOutlets().doc(id).get(); n++; }
+  await colOutlets().doc(id).set({ name, order: S.outlets.length });
+  inputEl.value = '';
+};
+ACTIONS['delete-outlet'] = async (el)=>{
+  if(!confirm('Remove this outlet? Any CSC already assigned to it will keep the reference, but it will disappear from the picker.')) return;
+  await colOutlets().doc(el.dataset.id).delete();
+};
+
+/* =========================================================
+   18. PROFILE ADD / EDIT MODAL
+========================================================= */
+function openProfileModal(id){
+  const isNew = !id;
+  const p = isNew ? { id:null, name:'', outlets:[], photoUrl:'', active:true, trophies:0, hearts:0 } : findProfile(id);
+  if(!isNew && !p) return;
+  window.__pendingPhoto = null;
+
+  const outletChecks = S.outlets.map(o=>{
+    const checked = p.outlets && p.outlets.indexOf(o.id) !== -1;
+    return '<label class="row" style="gap:6px;font-weight:600;font-size:13px;"><input type="checkbox" class="outlet-chk" value="'+o.id+'" '+(checked?'checked':'')+'> 🏢 '+esc(o.name)+'</label>';
+  }).join('') || '<span class="hint">No outlets yet — add one first under Outlet Management.</span>';
+
+  const avatarPreview = p.photoUrl
+    ? '<img class="avatar lg" id="photo-preview" src="'+esc(p.photoUrl)+'">'
+    : '<div class="avatar lg" id="photo-preview" style="background:'+colorForName(p.name||'?')+';">'+esc(initials(p.name||'?'))+'</div>';
+
+  openModal(
+    '<h3>'+(isNew?'Add CSC':'Edit CSC')+'</h3>'+
+    '<div class="stack" style="margin-top:12px;">'+
+      '<div class="row" style="gap:14px;align-items:center;">'+avatarPreview+
+        '<div style="flex:1;">'+
+          '<input type="file" accept="image/*" id="photo-file"><div class="hint">Choose a photo from your device (optional) — no link needed.</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="field"><label>Or paste a picture link (optional)</label><input type="text" id="photo-url" placeholder="paste a link here if you have one" value="'+esc(p.photoUrl && p.photoUrl.slice(0,5)!=='data:' ? p.photoUrl : '')+'"></div>'+
+      '<div class="field"><label>CSC Name</label><input type="text" id="p-name" value="'+esc(p.name)+'" required></div>'+
+      '<div class="field"><label>Assigned Outlet(s)</label><div class="stack" style="gap:6px;">'+outletChecks+'</div></div>'+
+      (!isNew ? '<label class="row" style="gap:6px;font-weight:600;font-size:13px;"><input type="checkbox" id="p-active" '+(p.active!==false?'checked':'')+'> Active (uncheck to hide temporarily — history is kept)</label>' : '')+
+    '</div>'+
+    '<div class="spread" style="margin-top:18px;">'+
+      (!isNew ? '<button class="btn danger sm" data-act="delete-profile" data-id="'+p.id+'">Delete Permanently</button>' : '<span></span>')+
+      '<div class="row" style="gap:8px;"><button class="btn secondary" data-act="modal-close">Cancel</button><button class="btn" data-act="save-profile" data-id="'+(p.id||'')+'" data-new="'+(isNew?1:0)+'">Save</button></div>'+
+    '</div>'
+  );
+
+  const fileInput = document.getElementById('photo-file');
+  if(fileInput){
+    fileInput.addEventListener('change', async ()=>{
+      const f = fileInput.files[0]; if(!f) return;
+      try{
+        const dataUrl = await resizeImageToDataURL(f, 320, 0.82);
+        window.__pendingPhoto = { url: dataUrl, id: null };
+        const prev = document.getElementById('photo-preview');
+        if(prev) prev.outerHTML = '<img class="avatar lg" id="photo-preview" src="'+dataUrl+'">';
+      }catch(e){ alert('Could not read that photo — please try a different file, or paste a picture link instead.'); }
+    });
+  }
+}
+// Turns a picked photo file into a small embedded picture (no upload, no link, no
+// account setup needed) — shrinks it down first so it stays small enough to save
+// directly alongside the CSC's other details.
+function resizeImageToDataURL(file, maxSize, quality){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onerror = ()=>reject(reader.error);
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onerror = ()=>reject(new Error('bad image'));
+      img.onload = ()=>{
+        let w = img.width, h = img.height;
+        if(w > h){ if(w > maxSize){ h = Math.round(h*maxSize/w); w = maxSize; } }
+        else { if(h > maxSize){ w = Math.round(w*maxSize/h); h = maxSize; } }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+ACTIONS['edit-profile'] = (el)=> openProfileModal(el.dataset.id || null);
+
+ACTIONS['save-profile'] = async (el)=>{
+  const isNew = el.dataset.new === '1';
+  let id = el.dataset.id;
+  const nameEl = document.getElementById('p-name');
+  const name = nameEl.value.trim();
+  if(!name){ alert('Please enter a name'); return; }
+  const outletsChecked = Array.from(document.querySelectorAll('.outlet-chk:checked')).map(c=>c.value);
+  const activeEl = document.getElementById('p-active');
+  const urlVal = document.getElementById('photo-url').value.trim();
+  let photoUrl = null, photoAssetId = null;
+  if(window.__pendingPhoto){ photoUrl = window.__pendingPhoto.url; photoAssetId = window.__pendingPhoto.id; }
+  else if(urlVal){ photoUrl = urlVal; }
+  else if(!isNew){ const existing = findProfile(id); photoUrl = existing ? (existing.photoUrl||null) : null; photoAssetId = existing ? (existing.photoAssetId||null) : null; }
+
+  const data = { name: name, outlets: outletsChecked, photoUrl: photoUrl, photoAssetId: photoAssetId };
+  if(!isNew) data.active = activeEl ? activeEl.checked : true;
+
+  el.disabled = true;
+  try{
+    if(isNew){
+      id = slugify(name);
+      let snap = await colProfiles().doc(id).get(); let n=2;
+      while(snap.exists){ id = slugify(name)+'-'+n; snap = await colProfiles().doc(id).get(); n++; }
+      data.trophies = 0; data.hearts = 0; data.active = true; data.order = S.profiles.length;
+      await colProfiles().doc(id).set(data);
+    } else {
+      await upsert(colProfiles().doc(id), data);
+    }
+    closeModal();
+  } finally { el.disabled = false; }
+};
+ACTIONS['delete-profile'] = async (el)=>{
+  if(!confirm('Permanently remove this CSC? This can\'t be undone (their daily/weekly history stays in the database but will no longer be shown).')) return;
+  await colProfiles().doc(el.dataset.id).delete();
+  closeModal();
+};
+
+boot();
+
+})();
+</script>
+</body>
+</html>
