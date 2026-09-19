@@ -718,6 +718,7 @@ function topbarHtml(opts){
 }
 
 function profileNavHtml(active, isAdmin){
+  // History used to be Admin-only; now everyone (CSC included) can see it.
   const tabs = [
     ['overview','📈','Overview'],
     ['calendar','📅','Calendar'],
@@ -725,10 +726,10 @@ function profileNavHtml(active, isAdmin){
     ['monthly','📊','Monthly'],
     ['outlet','🏢','Outlet'],
     ['achievements','🏆','Achievements'],
+    ['history','📋','History'],
   ];
-  if(isAdmin) tabs.push(['history','📋','History']);
   return '<div class="nav">'+tabs.map(([id,ic,label])=>
-    '<div class="navlink'+(id==='history'?' admin':'')+(active===id?' active':'')+'" data-act="profile-tab" data-tab="'+id+'">'+ic+' '+label+'</div>'
+    '<div class="navlink'+(active===id?' active':'')+'" data-act="profile-tab" data-tab="'+id+'">'+ic+' '+label+'</div>'
   ).join('')+'</div>';
 }
 ACTIONS['profile-tab'] = (el)=>{ S.tab = el.dataset.tab; renderCurrent(); };
@@ -785,7 +786,6 @@ function badgesHtml(p){
 }
 
 function loadProfileTab(p, isAdmin){
-  if(S.tab==='history' && !isAdmin) S.tab = 'overview'; // CSCs never see History, even if it was left selected
   if(S.tab==='overview') return loadOverviewTab(p, isAdmin);
   if(S.tab==='calendar') return loadCalendarTab(p, isAdmin);
   if(S.tab==='weekly') return loadWeeklyTab(p, isAdmin);
@@ -1539,10 +1539,9 @@ ACTIONS['save-month-tu-source'] = async (el)=>{
 };
 
 /* =========================================================
-   12c. HISTORY TAB — Admin-only day-by-day log
+   12c. HISTORY TAB — day-by-day log (visible to everyone, CSCs included)
 ========================================================= */
 function loadHistoryTab(p, isAdmin){
-  if(!isAdmin){ S.tab='overview'; return loadOverviewTab(p, isAdmin); }
   clearSubs();
   const year = S.historyCursor.getFullYear(), month = S.historyCursor.getMonth();
   const startStr = toISO(new Date(year,month,1));
@@ -1572,7 +1571,7 @@ function renderHistoryContent(p, isAdmin){
     if(!doc || (doc.apptTarget==null && doc.apptActual==null)) continue;
     const apptPct = doc.apptActual!=null ? pct(doc.apptActual, doc.apptTarget) : null;
     rows.push(
-      '<tr class="row-clickable" data-act="open-day" data-date="'+dateStr+'" data-csc="'+p.id+'" data-admin="1" data-can-edit-target="'+(canEditTarget?1:0)+'">'+
+      '<tr class="row-clickable" data-act="open-day" data-date="'+dateStr+'" data-csc="'+p.id+'" data-admin="'+(isAdmin?1:0)+'" data-can-edit-target="'+(canEditTarget?1:0)+'">'+
         '<td><b>'+MONTH_NAMES[month].slice(0,3)+' '+day+'</b> <span class="hint">('+WEEKDAYS_SHORT_SUN_FIRST[d.getDay()]+')</span></td>'+
         '<td>'+(doc.apptTarget??'—')+'</td>'+
         '<td>'+(doc.apptActual??'—')+'</td>'+
@@ -1586,11 +1585,11 @@ function renderHistoryContent(p, isAdmin){
     '<div class="card">'+
       '<div class="spread" style="margin-bottom:14px;">'+
         '<button class="iconbtn" data-act="history-prev">←</button>'+
-        '<div style="text-align:center;"><div class="section-title" style="margin:0;">'+monthTitle(S.historyCursor)+'</div><div class="hint">Daily history · Admin only</div></div>'+
+        '<div style="text-align:center;"><div class="section-title" style="margin:0;">'+monthTitle(S.historyCursor)+'</div><div class="hint">Daily history</div></div>'+
         '<button class="iconbtn" data-act="history-next">→</button>'+
       '</div>'+
       '<div class="row" style="justify-content:center;margin-bottom:14px;"><button class="btn-ghost" data-act="history-today">Back to this month</button></div>'+
-      '<p class="hint" style="margin:0 0 8px;">Click a day to edit its target or actual. Days with nothing entered are hidden here.</p>'+
+      '<p class="hint" style="margin:0 0 8px;">Click a day to view or edit its target/actual. Days with nothing entered are hidden here.'+(isAdmin?'':' The actual figure can only be updated by Admin.')+'</p>'+
       '<div class="table-wrap"><table><thead><tr><th>Date</th><th>APPT Target</th><th>APPT Actual</th><th>APPT %</th></tr></thead>'+
       '<tbody>'+body+'</tbody></table></div>'+
     '</div>';
