@@ -1365,7 +1365,7 @@ ACTIONS['monthly-next-year'] = ()=>{ S.monthlyYear += 1; renderCurrent(); };
 ACTIONS['monthly-this-year'] = ()=>{ S.monthlyYear = todayDate().getFullYear(); renderCurrent(); };
 
 async function loadMonthlyHistory(cscId, year){
-  const rows = Array.from({length:12}, (_,i)=>({ month:i, apptTarget:null, apptActual:null, tuTarget:null, tuActual:null }));
+  const rows = Array.from({length:12}, (_,i)=>({ month:i, apptTarget:null, apptActual:null, tuTarget:null, tuActual:null, tuActualEx:null, tuActualNew:null }));
   try{
     const snap = await colMonthly(cscId).get();
     snap.docs.forEach(d=>{
@@ -1377,6 +1377,10 @@ async function loadMonthlyHistory(cscId, year){
       rows[m].apptActual = dd.apptActual ?? null;
       rows[m].tuTarget = dd.tuTarget ?? null;
       rows[m].tuActual = dd.tuActual ?? null;
+      // TU source breakdown — additive info shown in its own table below the main
+      // one; doesn't change the main Target/Actual figures above.
+      rows[m].tuActualEx = dd.tuActualEx ?? null;
+      rows[m].tuActualNew = dd.tuActualNew ?? null;
     });
   }catch(e){}
   return rows;
@@ -1420,7 +1424,32 @@ function renderMonthlyContent(p, isAdmin, rows){
       '<p class="hint" style="margin:0 0 8px;">Click a month to fill in its target and actual figures.</p>'+
       '<div class="table-wrap"><table><thead><tr><th>Month</th><th>APPT (actual/target)</th><th>APPT %</th><th>TU (actual/target)</th><th>TU %</th></tr></thead>'+
       '<tbody>'+body+'</tbody></table></div>'+
-    '</div>';
+    '</div>'+
+    tuSourceCardHtml(p, isAdmin, rows, year);
+}
+
+// TU Source breakdown — separate card below the main Monthly table, showing how
+// each month's Actual TU splits between EX (existing customer) and NEW (new
+// customer). Purely additive: doesn't touch the main table's fields or figures.
+function tuSourceCardHtml(p, isAdmin, rows, year){
+  const canEditTuSource = isAdmin; // same rule as Actual figures elsewhere — Admin only
+  const body = rows.map(r=>{
+    const hasEither = r.tuActualEx!=null || r.tuActualNew!=null;
+    const total = hasEither ? (num(r.tuActualEx,0)+num(r.tuActualNew,0)) : null;
+    const monthStr = year+'-'+pad2(r.month+1);
+    return '<tr class="row-clickable" data-act="open-month-tu-source" data-month="'+monthStr+'" data-csc="'+p.id+'" data-admin="'+(isAdmin?1:0)+'"'+(!hasEither?' style="opacity:.6;"':'')+'>'+
+      '<td><b>'+MONTH_NAMES[r.month]+'</b></td>'+
+      '<td>'+(r.tuActualEx??'—')+'</td>'+
+      '<td>'+(r.tuActualNew??'—')+'</td>'+
+      '<td>'+(total??'—')+'</td>'+
+    '</tr>';
+  }).join('');
+  return '<div class="card" style="margin-top:16px;">'+
+    '<div class="card-title" style="margin:0 0 4px;">🔎 TU Source — EX vs NEW</div>'+
+    '<p class="hint" style="margin:0 0 8px;">Where each month\'s Actual TU came from — existing customers (EX) or new customers (NEW). '+(canEditTuSource?'Click a month to fill it in.':'Only Admin can fill this in.')+'</p>'+
+    '<div class="table-wrap"><table><thead><tr><th>Month</th><th>TU (EX)</th><th>TU (NEW)</th><th>Total</th></tr></thead>'+
+    '<tbody>'+body+'</tbody></table></div>'+
+  '</div>';
 }
 
 ACTIONS['open-month'] = async (el)=>{
@@ -1465,6 +1494,42 @@ ACTIONS['save-month-detail'] = async (el)=>{
     payload.tuActual = ta===''?null:num(ta,0);
     payload.actualSetAt = new Date().toISOString();
   }
+  el.disabled = true;
+  try{
+    await upsert(refMonthly(csc, monthStr), payload);
+    closeModal();
+    loadMonthlyTab(findProfile(csc), S.role==='admin');
+  } finally { el.disabled = false; }
+};
+
+ACTIONS['open-month-tu-source'] = async (el)=>{
+  const csc = el.dataset.csc, monthStr = el.dataset.month, isAdmin = el.dataset.admin==='1';
+  let data = {};
+  try{ const snap = await refMonthly(csc, monthStr).get(); data = snap.exists ? snap.data() : {}; }catch(e){}
+  const mIdx = Number(monthStr.slice(5,7)) - 1;
+  const label = MONTH_NAMES[mIdx]+' '+monthStr.slice(0,4)+' — TU Source';
+  openModal(
+    '<h3>'+label+'</h3>'+
+    '<p class="section-sub">'+esc(findProfile(csc).name)+'</p>'+
+    '<div class="grid cols-2" style="margin:14px 0;">'+
+      '<div class="field"><label>TU (EX — existing customer)</label><input type="number" min="0" id="month-tu-ex" value="'+(data.tuActualEx??'')+'" '+(isAdmin?'':'disabled')+'></div>'+
+      '<div class="field"><label>TU (NEW customer)</label><input type="number" min="0" id="month-tu-new" value="'+(data.tuActualNew??'')+'" '+(isAdmin?'':'disabled')+'></div>'+
+    '</div>'+
+    (!isAdmin ? '<p class="hint">Only Admin can fill this in.</p>' : '')+
+    '<div class="row" style="justify-content:flex-end;gap:8px;">'+
+      '<button class="btn secondary" data-act="modal-close">Cancel</button>'+
+      (isAdmin ? '<button class="btn" data-act="save-month-tu-source" data-csc="'+csc+'" data-month="'+monthStr+'">Save</button>' : '')+
+    '</div>'
+  );
+};
+ACTIONS['save-month-tu-source'] = async (el)=>{
+  const csc = el.dataset.csc, monthStr = el.dataset.month;
+  const exVal = document.getElementById('month-tu-ex').value;
+  const newVal = document.getElementById('month-tu-new').value;
+  const payload = {
+    tuActualEx: exVal===''?null:num(exVal,0),
+    tuActualNew: newVal===''?null:num(newVal,0),
+  };
   el.disabled = true;
   try{
     await upsert(refMonthly(csc, monthStr), payload);
