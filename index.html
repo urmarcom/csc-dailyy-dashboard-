@@ -1436,18 +1436,22 @@ function tuSourceCardHtml(p, isAdmin, rows, year){
   const body = rows.map(r=>{
     const hasEither = r.tuActualEx!=null || r.tuActualNew!=null;
     const total = hasEither ? (num(r.tuActualEx,0)+num(r.tuActualNew,0)) : null;
+    const exPct = hasEither ? pct(r.tuActualEx, total) : null;
+    const newPct = hasEither ? pct(r.tuActualNew, total) : null;
     const monthStr = year+'-'+pad2(r.month+1);
     return '<tr class="row-clickable" data-act="open-month-tu-source" data-month="'+monthStr+'" data-csc="'+p.id+'" data-admin="'+(isAdmin?1:0)+'"'+(!hasEither?' style="opacity:.6;"':'')+'>'+
       '<td><b>'+MONTH_NAMES[r.month]+'</b></td>'+
       '<td>'+(r.tuActualEx??'—')+'</td>'+
       '<td>'+(r.tuActualNew??'—')+'</td>'+
       '<td>'+(total??'—')+'</td>'+
+      '<td>'+(exPct==null?'—':exPct+'%')+'</td>'+
+      '<td>'+(newPct==null?'—':newPct+'%')+'</td>'+
     '</tr>';
   }).join('');
   return '<div class="card" style="margin-top:16px;">'+
     '<div class="card-title" style="margin:0 0 4px;">🔎 TU Source — EX vs NEW</div>'+
-    '<p class="hint" style="margin:0 0 8px;">Where each month\'s Actual TU came from — existing customers (EX) or new customers (NEW). '+(canEditTuSource?'Click a month to fill it in.':'Only Admin can fill this in.')+'</p>'+
-    '<div class="table-wrap"><table><thead><tr><th>Month</th><th>TU (EX)</th><th>TU (NEW)</th><th>Total</th></tr></thead>'+
+    '<p class="hint" style="margin:0 0 8px;">Where each month\'s Actual TU came from — existing customers (EX) or new customers (NEW), by count and by share. '+(canEditTuSource?'Click a month to fill it in.':'Only Admin can fill this in.')+'</p>'+
+    '<div class="table-wrap"><table><thead><tr><th>Month</th><th>TU (EX)</th><th>TU (NEW)</th><th>Total</th><th>EX %</th><th>NEW %</th></tr></thead>'+
     '<tbody>'+body+'</tbody></table></div>'+
   '</div>';
 }
