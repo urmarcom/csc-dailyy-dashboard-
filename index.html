@@ -541,6 +541,13 @@ html[data-theme="dark"] #app-followup{
     border:1px dashed var(--border);background:none;cursor:pointer;font-size:13px;font-weight:600;color:var(--accent);
   }
 #app-followup .day-add-btn:hover{background:var(--accent-soft);}
+#app-followup .sidebar-link .pill-admin-btn{opacity:.6;display:inline-flex;padding:1px;border-radius:4px;flex:none;}
+#app-followup .sidebar-link .pill-admin-btn:hover{opacity:1;background:rgba(0,0,0,0.12);}
+#app-followup .sidebar-add-btn{
+    display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:9px;margin-top:6px;
+    border:1px dashed var(--border);background:none;cursor:pointer;font-size:13px;font-weight:600;color:var(--accent);text-align:left;
+  }
+#app-followup .sidebar-add-btn:hover{background:var(--accent-soft);}
 #app-followup .chip-row{display:flex;gap:7px;flex-wrap:wrap;margin:14px 0 22px;}
 #app-followup .chip{
     padding:5px 12px;border-radius:100px;border:1px solid var(--border);background:var(--surface);
@@ -2759,6 +2766,43 @@ boot();
     }
   }
 
+  /* ---- categories (Admin: add / rename / delete from the sidebar) ---- */
+  function upsertCategoryLocal(cat){
+    const i = state.categories.findIndex(c => c.id === cat.id);
+    if(i >= 0) state.categories[i] = cat; else state.categories.push(cat);
+    saveLocalCache();
+  }
+  function removeCategoryLocal(id){
+    state.categories = state.categories.filter(c => c.id !== id);
+    saveLocalCache();
+  }
+  function saveCategory(cat){
+    if(useDb && db){
+      return db.collection("categories").doc(cat.id).set(cat).catch(function(e){
+        console.warn("save category failed", e);
+        showToast("Save failed — please try again", true);
+        throw e;
+      });
+    } else {
+      upsertCategoryLocal(cat);
+      render();
+      return Promise.resolve();
+    }
+  }
+  function deleteCategoryById(id){
+    if(useDb && db){
+      return db.collection("categories").doc(id).delete().catch(function(e){
+        console.warn("delete category failed", e);
+        showToast("Delete failed — please try again", true);
+        throw e;
+      });
+    } else {
+      removeCategoryLocal(id);
+      render();
+      return Promise.resolve();
+    }
+  }
+
   /* ============================= HELPERS ============================= */
   function uid(prefix){
     return (prefix||"tpl") + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
@@ -3002,8 +3046,13 @@ boot();
         const tone = toneVars(c.tone);
         const active = c.id === currentCategoryId;
         return '<button class="sidebar-link '+(active?'active':'')+'" data-action="open-category" data-cat="'+esc(c.id)+'">' +
-          '<span class="sidebar-dot" style="background:'+tone.ink+'"></span><span>'+esc(c.name)+'</span></button>';
+          '<span class="sidebar-dot" style="background:'+tone.ink+'"></span>' +
+          '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;">'+esc(c.name)+'</span>' +
+          (mode==='admin' ? '<span class="pill-admin-btn" data-action="rename-category" data-cat="'+esc(c.id)+'" title="Rename category">'+ICONS.pencil+'</span>' : '') +
+          (mode==='admin' ? '<span class="pill-admin-btn" data-action="delete-category" data-cat="'+esc(c.id)+'" title="Delete category">'+ICONS.trash+'</span>' : '') +
+        '</button>';
       }).join("") +
+      (mode==='admin' ? '<button class="sidebar-add-btn" data-action="add-category">'+ICONS.plus+'<span>Add Category</span></button>' : '') +
     '</div>';
   }
 
@@ -3302,6 +3351,21 @@ boot();
     render();
   }
 
+  function categoryModalHtml(){
+    const isAdd = modal.mode === "add";
+    return '<div class="overlay" data-action="close-modal-bg">' +
+      '<div class="modal confirm-modal" data-stop="1">' +
+        '<div class="modal-head"><h2>'+(isAdd?'Add Category':'Rename Category')+'</h2>' +
+          '<button class="icon-btn" data-action="close-modal">'+ICONS.x+'</button></div>' +
+        '<div class="field"><label>Category name</label><input type="text" id="categoryNameInput" value="'+esc(modal.value)+'" placeholder="e.g. 299 PROMO"></div>' +
+        '<div class="modal-actions">' +
+          '<button class="btn" data-action="close-modal">Cancel</button>' +
+          '<button class="btn btn-primary" data-action="save-category">'+ICONS.check+' '+(isAdd?'Add':'Rename')+'</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
   function lightboxHtml(){
     const imgs = lightbox.images;
     const cur = imgs[lightbox.index];
@@ -3375,7 +3439,7 @@ boot();
       '<header class="app-header" id="appHeader"></header>' +
       (mode==='admin' ? '<div class="admin-banner">'+ICONS.shield+'<span>Admin Mode — changes '+(useDb?'sync to the whole team':'are saved to this browser only')+'. Switch back to CSC Mode when you\'re done editing.</span></div>' : '') +
       '<div class="view">' + viewHtml + '</div>' +
-      (modal ? (modal.type==='template' ? templateModalHtml() : modal.type==='rename-day' ? renameDayModalHtml() : modal.type==='admin-password' ? adminPasswordModalHtml() : confirmModalHtml()) : '') +
+      (modal ? (modal.type==='template' ? templateModalHtml() : modal.type==='rename-day' ? renameDayModalHtml() : modal.type==='category' ? categoryModalHtml() : modal.type==='admin-password' ? adminPasswordModalHtml() : confirmModalHtml()) : '') +
       (lightbox ? lightboxHtml() : '');
 
     renderHeader();
@@ -3602,6 +3666,68 @@ boot();
             render();
           });
         }, "Delete " + unitLabelOf(currentCategoryId));
+        break;
+      }
+
+      /* ---- admin: categories (sidebar) ---- */
+      case "add-category": {
+        modal = { type:"category", mode:"add", value:"" };
+        render();
+        break;
+      }
+      case "rename-category": {
+        const cat = categoryById(t.dataset.cat);
+        modal = { type:"category", mode:"rename", catId: t.dataset.cat, value: cat ? cat.name : "" };
+        render();
+        break;
+      }
+      case "save-category": {
+        const input = document.getElementById("categoryNameInput");
+        const name = input.value.trim();
+        if(!name){ break; }
+        if(modal.mode === "add"){
+          const newCat = { id: uid("cat"), name: name, subtitle: "", tone: (state.categories.length % 5) + 1, unitLabel: "Day" };
+          saveCategory(newCat).then(function(){
+            modal = null;
+            currentCategoryId = newCat.id;
+            currentDay = "__all__";
+            purposeFilter = null;
+            view = "category";
+            render();
+          }).catch(function(){});
+        } else {
+          const cat = categoryById(modal.catId);
+          if(cat && name !== cat.name){
+            const updated = Object.assign({}, cat, { name: name });
+            saveCategory(updated).then(function(){ modal = null; render(); }).catch(function(){});
+          } else {
+            modal = null;
+            render();
+          }
+        }
+        break;
+      }
+      case "delete-category": {
+        const catId = t.dataset.cat;
+        const cat = categoryById(catId);
+        const count = templatesOf(catId).length;
+        openConfirm(
+          "Delete "+(cat?cat.name:"this category")+"?",
+          "This will delete this category"+(count>0 ? " and its "+count+" template"+(count===1?"":"s") : "")+" for everyone. This can't be undone.",
+          function(){
+            const toDelete = state.templates.filter(x=>x.categoryId===catId);
+            toDelete.forEach(function(x){ getImageObjs(x).forEach(function(o){ persistImageDelete(o.id); }); });
+            Promise.all(toDelete.map(x=>deleteTemplateById(x.id).catch(function(){}))).then(function(){
+              return deleteCategoryById(catId);
+            }).then(function(){
+              if(currentCategoryId === catId){
+                view = "home"; currentCategoryId = null; currentDay = null;
+              }
+              render();
+            }).catch(function(){});
+          },
+          "Delete Category"
+        );
         break;
       }
 
