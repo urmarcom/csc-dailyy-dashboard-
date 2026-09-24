@@ -760,14 +760,30 @@ html[data-theme="dark"] #app-followup{
 <div class="hub-switcher" id="hub-switcher">
   <button type="button" class="hub-switch-btn active" data-hub-switch="dashboard">📊 Performance Dashboard</button>
   <button type="button" class="hub-switch-btn" data-hub-switch="followup">💬 Follow Up Hub</button>
+  <button type="button" class="hub-switch-btn" data-hub-switch="whiteboard">🗒️ Whiteboard</button>
+  <button type="button" class="hub-switch-btn" data-hub-switch="meeting">📋 Meeting Minutes</button>
+  <button type="button" class="hub-switch-btn" data-hub-switch="casestudy">🔬 Case Study</button>
 </div>
 <div class="hub-pane active" id="hub-pane-dashboard">
 <div class="app" id="app"><div class="empty-state">Loading…</div></div>
-<div id="modal-root"></div>
 </div>
 <div class="hub-pane" id="hub-pane-followup">
 <div id="app-followup"></div>
 </div>
+<div class="hub-pane" id="hub-pane-whiteboard">
+<div id="app-whiteboard"><div class="empty-state">Loading…</div></div>
+</div>
+<div class="hub-pane" id="hub-pane-meeting">
+<div id="app-meeting"><div class="empty-state">Loading…</div></div>
+</div>
+<div class="hub-pane" id="hub-pane-casestudy">
+<div id="app-casestudy"></div>
+</div>
+<!-- Lives outside every hub-pane (not just the Dashboard's) so a modal opened from
+     Whiteboard/Meeting Minutes still renders on top no matter which tab is active —
+     a hub-pane that isn't active is display:none, which would hide anything nested
+     inside it, position:fixed or not. -->
+<div id="modal-root"></div>
 <!-- ============================================================
      FIREBASE SETUP — read FIREBASE-SETUP.md for step-by-step help.
      1) Paste your project's config below (Firebase console → Project settings → your web app → SDK setup and configuration → "Config").
@@ -922,6 +938,13 @@ function refScheduleMonth(monthStr){ return S.db.doc('schedule/'+monthStr); }
 // an appointment on your phone) — any signed-in CSC or Admin can edit it, same rule
 // as targets. Kept separate from the shared Team Schedule below.
 function refPersonalScheduleMonth(cscId, monthStr){ return S.db.doc('schedulePersonal/'+cscId+'/months/'+monthStr); }
+// Whiteboard: a feed of announcement posts (title + date + content), open to anyone
+// (Admin or CSC) to post/edit/delete — for the team's current direction, reminders,
+// or anything worth keeping visible. Shown newest-first, like an announcement board.
+function colWhiteboard(){ return S.db.collection('whiteboardPosts'); }
+// Meeting Minutes: a flat list of entries, tagged 'general' or 'case-study' so the tab can
+// show them as two separate lists. Open to anyone to add/edit/delete, same as Whiteboard.
+function colMeetingMinutes(){ return S.db.collection('meetingMinutes'); }
 
 async function upsert(ref, data){
   // merge:true deep-merges nested maps (e.g. outlets.<id>.tuTarget) and works
@@ -982,6 +1005,20 @@ async function boot(){
     renderCurrent();
   }, err=>{ console.error('config sub', err); }));
 
+  // Whiteboard + Meeting Minutes: simple team-shared tools living in their own
+  // hub-switcher tabs, open to Admin and CSC alike (no separate login needed).
+  addSubGlobal(colWhiteboard().onSnapshot(snap=>{
+    S.cache.whiteboardPosts = snap.docs.map(d=>Object.assign({id:d.id}, d.data()));
+    renderWhiteboardPane();
+  }, err=>{ console.error('whiteboard sub', err); }));
+
+  addSubGlobal(colMeetingMinutes().onSnapshot(snap=>{
+    S.cache.meetingDocs = snap.docs.map(d=>Object.assign({id:d.id}, d.data()));
+    renderMeetingPane();
+  }, err=>{ console.error('meeting sub', err); }));
+
+  renderCaseStudyPane();
+
   // restore last used role (per-viewer convenience only)
   try{
     const lastRole = localStorage.getItem('csc_last_role');
@@ -1021,6 +1058,16 @@ on(appEl, 'change', (e)=>{ const t = e.target.closest('[data-act-change]'); if(t
 on(modalEl, 'change', (e)=>{ const t = e.target.closest('[data-act-change]'); if(t) dispatchChange(t, e); });
 on(appEl, 'submit', (e)=>{ const t = e.target.closest('[data-act-submit]'); if(t){ e.preventDefault(); dispatchSubmit(t, e); } });
 on(modalEl, 'submit', (e)=>{ const t = e.target.closest('[data-act-submit]'); if(t){ e.preventDefault(); dispatchSubmit(t, e); } });
+
+// Whiteboard / Meeting Minutes / Case Study live in their own hub-switcher panes,
+// outside #app, but reuse this same ACTIONS/dispatch system — so they need the
+// same delegated listeners wired to their own container elements.
+[document.getElementById('app-whiteboard'), document.getElementById('app-meeting'), document.getElementById('app-casestudy')].forEach(root=>{
+  if(!root) return;
+  on(root, 'click', (e)=>{ const t = e.target.closest('[data-act]'); if(t) dispatch(t, e); });
+  on(root, 'change', (e)=>{ const t = e.target.closest('[data-act-change]'); if(t) dispatchChange(t, e); });
+  on(root, 'submit', (e)=>{ const t = e.target.closest('[data-act-submit]'); if(t){ e.preventDefault(); dispatchSubmit(t, e); } });
+});
 
 function dv(el, name){ return el.dataset[name]; }
 
@@ -2630,6 +2677,235 @@ ACTIONS['delete-profile'] = async (el)=>{
   closeModal();
 };
 
+/* =========================================================
+   19. WHITEBOARD (own hub-switcher tab) — an announcement-board style
+   feed: anyone can post/edit/delete, newest post on top, the most
+   recent one flagged with a "Latest" badge.
+========================================================= */
+function whiteboardContentField(value){
+  return '<div class="field" style="margin-bottom:14px;"><label>Content</label>'+
+    '<textarea id="wb-content" rows="7" style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-size:14px;line-height:1.55;font-family:inherit;resize:vertical;">'+esc(value||'')+'</textarea></div>';
+}
+function whiteboardWhenLabel(p){
+  const d = p.createdAt ? new Date(p.createdAt) : null;
+  let label = d ? d.toLocaleString([], {month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '';
+  if(p.updatedAt && p.updatedAt !== p.createdAt) label += ' · edited';
+  return label;
+}
+function renderWhiteboardPane(){
+  const el = document.getElementById('app-whiteboard');
+  if(!el) return;
+  const posts = (S.cache.whiteboardPosts || []).slice()
+    .sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+
+  const cardsHtml = posts.map((p, i)=>
+    '<div class="card" style="margin-bottom:14px;border-left:4px solid var(--accent);">'+
+      '<div class="spread" style="align-items:flex-start;margin-bottom:8px;">'+
+        '<div>'+
+          (i===0 ? '<span class="pill" style="background:var(--accent-soft);color:var(--accent-soft-ink);margin-bottom:6px;">🆕 Latest</span>' : '')+
+          '<div class="section-title" style="font-size:16px;margin:2px 0 2px;">📢 '+esc(p.title||'(untitled)')+'</div>'+
+          '<div class="hint">'+esc(whiteboardWhenLabel(p))+'</div>'+
+        '</div>'+
+        '<div class="row" style="gap:4px;">'+
+          '<button class="iconbtn sm" data-act="edit-whiteboard-post" data-id="'+p.id+'" title="Edit">✏️</button>'+
+          '<button class="iconbtn sm" data-act="delete-whiteboard-post" data-id="'+p.id+'" title="Delete">✕</button>'+
+        '</div>'+
+      '</div>'+
+      '<div style="white-space:pre-wrap;font-size:13.5px;line-height:1.6;">'+esc(p.content||'')+'</div>'+
+    '</div>'
+  ).join('') || '<div class="empty-state">📢<br>No announcements yet — click "+ Post Announcement" to write the first one.</div>';
+
+  el.innerHTML =
+    '<div class="app" style="max-width:820px;">'+
+      '<div class="topbar"><div class="topbar-row"><div class="brand">'+
+        '<div class="brand-mark">📢</div>'+
+        '<div class="brand-text"><div class="t1">URKLINIK</div><div class="t2">Whiteboard</div></div>'+
+      '</div></div></div>'+
+      '<div class="row" style="justify-content:space-between;align-items:flex-start;margin-bottom:16px;gap:12px;flex-wrap:wrap;">'+
+        '<p class="hint" style="margin:0;max-width:480px;">Anyone can post here — team direction, reminders, anything worth keeping visible. Newest on top.</p>'+
+        '<button class="btn sm" data-act="add-whiteboard-post">+ Post Announcement</button>'+
+      '</div>'+
+      cardsHtml+
+    '</div>';
+}
+ACTIONS['add-whiteboard-post'] = ()=>{
+  openModal(
+    '<h3>📢 Post Announcement</h3>'+
+    '<div class="field" style="margin-bottom:12px;"><label>Title</label><input type="text" id="wb-title" placeholder="e.g. Q4 focus"></div>'+
+    whiteboardContentField('')+
+    '<div class="row" style="justify-content:flex-end;gap:8px;">'+
+      '<button class="btn secondary" data-act="modal-close">Cancel</button>'+
+      '<button class="btn" data-act="save-whiteboard-post">Post</button>'+
+    '</div>'
+  );
+};
+ACTIONS['save-whiteboard-post'] = async (el)=>{
+  const title = document.getElementById('wb-title').value.trim();
+  const content = document.getElementById('wb-content').value.trim();
+  if(!title){ alert('Please give the announcement a title'); return; }
+  el.disabled = true;
+  try{
+    const now = new Date().toISOString();
+    await colWhiteboard().doc().set({ title, content, createdAt: now, updatedAt: now });
+    closeModal();
+  } finally { el.disabled = false; }
+};
+ACTIONS['edit-whiteboard-post'] = (el)=>{
+  const id = el.dataset.id;
+  const p = (S.cache.whiteboardPosts||[]).find(x=>x.id===id);
+  if(!p) return;
+  openModal(
+    '<h3>Edit Announcement</h3>'+
+    '<div class="field" style="margin-bottom:12px;"><label>Title</label><input type="text" id="wb-title" value="'+esc(p.title||'')+'"></div>'+
+    whiteboardContentField(p.content||'')+
+    '<div class="row" style="justify-content:flex-end;gap:8px;">'+
+      '<button class="btn secondary" data-act="modal-close">Cancel</button>'+
+      '<button class="btn" data-act="update-whiteboard-post" data-id="'+id+'">Save</button>'+
+    '</div>'
+  );
+};
+ACTIONS['update-whiteboard-post'] = async (el)=>{
+  const id = el.dataset.id;
+  const title = document.getElementById('wb-title').value.trim();
+  const content = document.getElementById('wb-content').value.trim();
+  if(!title){ alert('Please give the announcement a title'); return; }
+  el.disabled = true;
+  try{
+    await upsert(colWhiteboard().doc(id), { title, content, updatedAt: new Date().toISOString() });
+    closeModal();
+  } finally { el.disabled = false; }
+};
+ACTIONS['delete-whiteboard-post'] = async (el)=>{
+  if(!confirm('Delete this announcement? This can\'t be undone.')) return;
+  await colWhiteboard().doc(el.dataset.id).delete();
+};
+
+/* =========================================================
+   20. MEETING MINUTES (own hub-switcher tab)
+========================================================= */
+function meetingTextareaField(){
+  return '<div class="field" style="margin-bottom:14px;"><label>Content</label>'+
+    '<textarea id="mm-content" rows="8" style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-size:14px;line-height:1.55;font-family:inherit;resize:vertical;"></textarea></div>';
+}
+function renderMeetingPane(){
+  const el = document.getElementById('app-meeting');
+  if(!el) return;
+  const cat = S.cache.meetingCat || 'general';
+  const all = S.cache.meetingDocs || [];
+  const items = all.filter(d=>(d.category||'general')===cat)
+                    .sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  const rows = items.map(d=>
+    '<div class="card" style="margin-bottom:12px;">'+
+      '<div class="spread" style="margin-bottom:8px;">'+
+        '<div class="card-title" style="margin:0;">'+esc(d.date||'')+' · '+esc(d.title||'(untitled)')+'</div>'+
+        '<div class="row" style="gap:4px;">'+
+          '<button class="iconbtn sm" data-act="edit-meeting-minute" data-id="'+d.id+'" title="Edit">✏️</button>'+
+          '<button class="iconbtn sm" data-act="delete-meeting-minute" data-id="'+d.id+'" title="Delete">✕</button>'+
+        '</div>'+
+      '</div>'+
+      '<div style="white-space:pre-wrap;font-size:13.5px;line-height:1.6;">'+esc(d.content||'')+'</div>'+
+    '</div>'
+  ).join('') || '<p class="hint">No entries yet — click "+ Add Entry" to write the first one.</p>';
+
+  el.innerHTML =
+    '<div class="app" style="max-width:820px;">'+
+      '<div class="topbar">'+
+        '<div class="topbar-row"><div class="brand">'+
+          '<div class="brand-mark">📋</div>'+
+          '<div class="brand-text"><div class="t1">URKLINIK</div><div class="t2">Meeting Minutes</div></div>'+
+        '</div></div>'+
+        '<div class="nav">'+
+          '<div class="navlink'+(cat==='general'?' active':'')+'" data-act="meeting-set-cat" data-cat="general">📋 Meeting Minutes</div>'+
+          '<div class="navlink'+(cat==='case-study'?' active':'')+'" data-act="meeting-set-cat" data-cat="case-study">🔬 Case Study Meeting Minutes</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="row" style="justify-content:flex-end;margin-bottom:14px;">'+
+        '<button class="btn sm" data-act="add-meeting-minute" data-cat="'+cat+'">+ Add Entry</button>'+
+      '</div>'+
+      rows+
+    '</div>';
+}
+ACTIONS['meeting-set-cat'] = (el)=>{ S.cache.meetingCat = el.dataset.cat; renderMeetingPane(); };
+ACTIONS['add-meeting-minute'] = (el)=>{
+  const cat = el.dataset.cat || 'general';
+  openModal(
+    '<h3>'+(cat==='case-study'?'🔬 Add Case Study Meeting Minute':'📋 Add Meeting Minute')+'</h3>'+
+    '<div class="field" style="margin-bottom:12px;"><label>Date</label><input type="date" id="mm-date" value="'+toISO(todayDate())+'"></div>'+
+    '<div class="field" style="margin-bottom:12px;"><label>Title</label><input type="text" id="mm-title" placeholder="e.g. Weekly sync"></div>'+
+    meetingTextareaField()+
+    '<div class="row" style="justify-content:flex-end;gap:8px;">'+
+      '<button class="btn secondary" data-act="modal-close">Cancel</button>'+
+      '<button class="btn" data-act="save-meeting-minute" data-cat="'+cat+'">Save</button>'+
+    '</div>'
+  );
+};
+ACTIONS['save-meeting-minute'] = async (el)=>{
+  const cat = el.dataset.cat || 'general';
+  const date = document.getElementById('mm-date').value;
+  const title = document.getElementById('mm-title').value.trim();
+  const content = document.getElementById('mm-content').value.trim();
+  if(!date || !title){ alert('Please fill in a date and title'); return; }
+  el.disabled = true;
+  try{
+    await colMeetingMinutes().doc().set({ date, title, content, category: cat, createdAt: new Date().toISOString() });
+    closeModal();
+  } finally { el.disabled = false; }
+};
+ACTIONS['edit-meeting-minute'] = (el)=>{
+  const id = el.dataset.id;
+  const d = (S.cache.meetingDocs||[]).find(x=>x.id===id);
+  if(!d) return;
+  openModal(
+    '<h3>Edit Entry</h3>'+
+    '<div class="field" style="margin-bottom:12px;"><label>Date</label><input type="date" id="mm-date" value="'+esc(d.date||'')+'"></div>'+
+    '<div class="field" style="margin-bottom:12px;"><label>Title</label><input type="text" id="mm-title" value="'+esc(d.title||'')+'"></div>'+
+    '<div class="field" style="margin-bottom:14px;"><label>Content</label>'+
+      '<textarea id="mm-content" rows="8" style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-size:14px;line-height:1.55;font-family:inherit;resize:vertical;">'+esc(d.content||'')+'</textarea>'+
+    '</div>'+
+    '<div class="row" style="justify-content:flex-end;gap:8px;">'+
+      '<button class="btn secondary" data-act="modal-close">Cancel</button>'+
+      '<button class="btn" data-act="update-meeting-minute" data-id="'+id+'">Save</button>'+
+    '</div>'
+  );
+};
+ACTIONS['update-meeting-minute'] = async (el)=>{
+  const id = el.dataset.id;
+  const date = document.getElementById('mm-date').value;
+  const title = document.getElementById('mm-title').value.trim();
+  const content = document.getElementById('mm-content').value.trim();
+  if(!date || !title){ alert('Please fill in a date and title'); return; }
+  el.disabled = true;
+  try{
+    await upsert(colMeetingMinutes().doc(id), { date, title, content });
+    closeModal();
+  } finally { el.disabled = false; }
+};
+ACTIONS['delete-meeting-minute'] = async (el)=>{
+  if(!confirm('Delete this entry? This can\'t be undone.')) return;
+  await colMeetingMinutes().doc(el.dataset.id).delete();
+};
+
+/* =========================================================
+   21. CASE STUDY REVIEW (placeholder — reserved tab, to be connected once
+   the separate Case Study Review Dashboard project is ready)
+========================================================= */
+function renderCaseStudyPane(){
+  const el = document.getElementById('app-casestudy');
+  if(!el) return;
+  el.innerHTML =
+    '<div class="app" style="max-width:820px;">'+
+      '<div class="topbar"><div class="topbar-row"><div class="brand">'+
+        '<div class="brand-mark">🔬</div>'+
+        '<div class="brand-text"><div class="t1">URKLINIK</div><div class="t2">Case Study Review</div></div>'+
+      '</div></div></div>'+
+      '<div class="card" style="text-align:center;padding:48px 24px;">'+
+        '<div style="font-size:34px;margin-bottom:10px;">🚧</div>'+
+        '<h2 class="display" style="margin:0 0 6px;">Coming soon</h2>'+
+        '<p class="section-sub" style="margin:0;">This tab is reserved — it\'ll connect to the Case Study Review Dashboard once that\'s ready.</p>'+
+      '</div>'+
+    '</div>';
+}
+
 boot();
 
 })();
@@ -3983,12 +4259,20 @@ boot();
 (function(){
   "use strict";
   var switcher = document.getElementById("hub-switcher");
-  var paneDashboard = document.getElementById("hub-pane-dashboard");
-  var paneFollowup = document.getElementById("hub-pane-followup");
+  var btns = Array.prototype.slice.call(switcher.querySelectorAll(".hub-switch-btn"));
+  // Generic over however many hub-switch-btn / hub-pane-<name> pairs exist, so adding
+  // another tab later needs no changes here — just a new button + matching pane.
+  var panes = {};
+  btns.forEach(function(b){
+    var name = b.dataset.hubSwitch;
+    panes[name] = document.getElementById("hub-pane-" + name);
+  });
   function setActive(target){
-    paneDashboard.classList.toggle("active", target === "dashboard");
-    paneFollowup.classList.toggle("active", target === "followup");
-    Array.prototype.forEach.call(switcher.querySelectorAll(".hub-switch-btn"), function(b){
+    if(!panes[target]) return;
+    Object.keys(panes).forEach(function(name){
+      if(panes[name]) panes[name].classList.toggle("active", name === target);
+    });
+    btns.forEach(function(b){
       b.classList.toggle("active", b.dataset.hubSwitch === target);
     });
     try{ localStorage.setItem("hub_active_tab", target); }catch(e){}
@@ -4000,7 +4284,7 @@ boot();
   });
   var last = null;
   try{ last = localStorage.getItem("hub_active_tab"); }catch(e){}
-  if(last === "followup") setActive("followup");
+  if(last && panes[last]) setActive(last);
 })();
 </script>
 </body>
