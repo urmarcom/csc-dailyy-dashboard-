@@ -869,6 +869,7 @@ const S = {
   dbReady: false,
   role: null,        // 'csc' | 'admin' | null
   cscId: null,       // the profile currently being VIEWED (any CSC, or admin drilled-in)
+  myCscId: null,     // which CSC THIS DEVICE belongs to (for personal-schedule privacy in CSC mode)
   adminUnlocked: false,
   profiles: [],      // live array from subscription
   outlets: [],
@@ -892,6 +893,13 @@ function outletName(id){ const o = S.outlets.find(o=>o.id===id); return o ? o.na
 // Any signed-in CSC can set a target on any profile (the team shares one open CSC login);
 // only Admin can ever touch Actual results and Achievements — that split still holds.
 function canEditTargetFor(p){ return S.role === 'admin' || S.role === 'csc'; }
+// My Schedule (Calendar tab) is private: only Admin, or the CSC this device has identified
+// itself as, may see or edit a given profile's personal schedule.
+function canSeePersonalFor(p){
+  if(S.role === 'admin') return true;
+  if(S.role === 'csc') return !!S.myCscId && S.myCscId === p.id;
+  return false;
+}
 
 /* =========================================================
    2. DB REFS
@@ -978,6 +986,8 @@ async function boot(){
   try{
     const lastRole = localStorage.getItem('csc_last_role');
     if(lastRole === 'csc'){ S.role='csc'; S.cscId=null; S.tab='team'; }
+    const lastMyId = localStorage.getItem('csc_my_id');
+    if(lastMyId){ S.myCscId = lastMyId; }
   }catch(e){}
 
   renderCurrent();
@@ -1397,7 +1407,68 @@ ACTIONS['save-week-actual'] = async (el)=>{
 /* =========================================================
    11. CALENDAR TAB
 ========================================================= */
+// First time a CSC-mode device opens the Calendar tab, ask which CSC this device
+// belongs to (remembered locally) so My Schedule can stay private per-person.
+// Everything outside the Calendar tab is unaffected — Team Overview and other
+// profile tabs never require this.
+function renderIdentityPicker(){
+  const profiles = activeProfiles();
+  contentEl().innerHTML =
+    '<div class="card">'+
+      '<div class="card-title" style="margin-bottom:6px;">🙋 Which one are you?</div>'+
+      '<p class="section-sub" style="margin:0 0 14px;">This device will remember your choice, so your own "My Schedule" stays private from teammates. Admin can still see everyone\'s. If Admin has set a Calendar password for you, you\'ll need it here.</p>'+
+      '<div class="role-grid">'+
+        profiles.map(pp=>'<div class="role-opt" data-act="prompt-my-identity" data-id="'+pp.id+'"><div class="ic">'+(pp.calendarPin?'🔒':'🙋')+'</div>'+esc(pp.name)+'</div>').join('')+
+      '</div>'+
+    '</div>';
+}
+// Picking a name is just a per-device convenience, not real authentication — anyone could
+// otherwise click any name and read that person's private schedule. So if Admin has set a
+// Calendar password for that CSC, confirming "who you are" requires it.
+ACTIONS['prompt-my-identity'] = (el)=>{
+  const id = el.dataset.id;
+  const p = findProfile(id);
+  if(!p) return;
+  if(!p.calendarPin){
+    S.myCscId = id;
+    try{ localStorage.setItem('csc_my_id', id); }catch(e){}
+    loadCalendarTab(findProfile(S.cscId), S.role==='admin');
+    return;
+  }
+  openModal(
+    '<h3>🔒 '+esc(p.name)+'</h3>'+
+    '<p class="section-sub">Enter '+esc(p.name)+'\'s Calendar password to open '+esc(p.name)+'\'s My Schedule.</p>'+
+    '<form data-act-submit="confirm-my-identity" data-id="'+id+'" class="stack" style="text-align:left;">'+
+      '<div class="field"><label>Password</label><input type="password" id="my-id-pin" required autocomplete="off"></div>'+
+      '<div id="my-id-pin-err" class="hint" style="color:var(--danger);"></div>'+
+      '<div class="row" style="justify-content:flex-end;gap:8px;">'+
+        '<button type="button" class="btn secondary" data-act="modal-close">Cancel</button>'+
+        '<button class="btn" type="submit">Confirm</button>'+
+      '</div>'+
+    '</form>'
+  );
+};
+ACTIONS['confirm-my-identity'] = (el)=>{
+  const id = el.dataset.id;
+  const p = findProfile(id);
+  const val = document.getElementById('my-id-pin') ? document.getElementById('my-id-pin').value : '';
+  if(!p || val !== (p.calendarPin||'')){
+    const err = document.getElementById('my-id-pin-err');
+    if(err) err.textContent = 'Wrong password — please try again.';
+    return;
+  }
+  S.myCscId = id;
+  try{ localStorage.setItem('csc_my_id', id); }catch(e){}
+  closeModal();
+  loadCalendarTab(findProfile(S.cscId), S.role==='admin');
+};
+ACTIONS['reset-my-identity'] = ()=>{
+  S.myCscId = null;
+  try{ localStorage.removeItem('csc_my_id'); }catch(e){}
+  loadCalendarTab(findProfile(S.cscId), S.role==='admin');
+};
 function loadCalendarTab(p, isAdmin){
+  if(S.role === 'csc' && !S.myCscId){ renderIdentityPicker(); return; }
   clearSubs();
   const year = S.calCursor.getFullYear(), month = S.calCursor.getMonth();
   const startStr = toISO(new Date(year,month,1));
@@ -1459,10 +1530,11 @@ function renderCalendarContent(p, isAdmin){
   const weeks = monthMatrix(year, month);
   const docs = S.cache.calDocs || {};
   const scheduleDocs = S.cache.scheduleDocs || {};
-  const personalDocs = S.cache.personalScheduleDocs || {};
+  const canSeePersonal = canSeePersonalFor(p);
+  const personalDocs = canSeePersonal ? (S.cache.personalScheduleDocs || {}) : {}; // hidden entirely if not yours (or Admin)
   const today = todayDate();
   const canEditTarget = canEditTargetFor(p);
-  const canEditPersonal = canEditTargetFor(p); // same "any signed-in CSC or Admin" rule as targets
+  const canEditPersonal = canSeePersonal; // seeing it and editing it are the same permission now
 
   let grid = '<div class="cal-head">'+WEEKDAYS.map(d=>'<span>'+d+'</span>').join('')+'</div><div class="cal-grid">';
   weeks.forEach(row=>{
@@ -1511,6 +1583,22 @@ function renderCalendarContent(p, isAdmin){
       '</div>';
   }
 
+  const notYouLinkHtml = S.role==='csc' ? '<button class="btn-ghost sm" data-act="reset-my-identity" style="margin-left:8px;">Not you?</button>' : '';
+  const myScheduleCardHtml = canSeePersonal ?
+    '<div class="card" style="margin-top:16px;">'+
+      '<div class="spread" style="margin-bottom:10px;">'+
+        '<div class="card-title" style="margin:0;">📝 My Schedule — '+esc(p.name)+' — '+monthTitle(S.calCursor)+'</div>'+
+        (canEditPersonal ? '<button class="btn sm" data-act="open-add-schedule" data-scope="personal">+ Add</button>' : '')+
+      '</div>'+
+      '<p class="hint" style="margin:0 0 10px;">Set what '+esc(p.name)+' needs to do and when — like setting an appointment on your own calendar. 🔒 Only '+(S.role==='admin'?'Admin':'you')+' and Admin can see this.'+notYouLinkHtml+'</p>'+
+      monthScheduleSectionHtml(personalDocs, canEditPersonal, 'personal')+
+    '</div>'
+  :
+    '<div class="card" style="margin-top:16px;">'+
+      '<div class="card-title" style="margin:0 0 8px;">📝 My Schedule</div>'+
+      '<p class="hint" style="margin:0;">🔒 This is private — only '+esc(p.name)+' or Admin can see it.</p>'+
+    '</div>';
+
   contentEl().innerHTML =
     '<div class="card">'+
       '<div class="spread" style="margin-bottom:14px;">'+
@@ -1524,14 +1612,7 @@ function renderCalendarContent(p, isAdmin){
         '<button class="btn-ghost" data-act="cal-today" style="margin-left:auto;">Back to this month</button>'+
       '</div>'+
     '</div>'+
-    '<div class="card" style="margin-top:16px;">'+
-      '<div class="spread" style="margin-bottom:10px;">'+
-        '<div class="card-title" style="margin:0;">📝 My Schedule — '+esc(p.name)+' — '+monthTitle(S.calCursor)+'</div>'+
-        (canEditPersonal ? '<button class="btn sm" data-act="open-add-schedule" data-scope="personal">+ Add</button>' : '')+
-      '</div>'+
-      '<p class="hint" style="margin:0 0 10px;">Set what '+esc(p.name)+' needs to do and when — like setting an appointment on your own calendar. '+(canEditPersonal?'Anyone signed in can set this.':'Only Admin or a signed-in CSC can set this.')+'</p>'+
-      monthScheduleSectionHtml(personalDocs, canEditPersonal, 'personal')+
-    '</div>'+
+    myScheduleCardHtml+
     teamCardHtml;
 }
 
@@ -1555,6 +1636,14 @@ function monthScheduleSectionHtml(scheduleDocs, canEdit, scope){
   }).join('');
 }
 
+// A single date-picker row inside the "add schedule" modal. Several rows let the
+// same time+text item be saved to several days in one go (the bulk multi-day-add feature).
+function scheduleDateRowHtml(value, minDate, maxDate){
+  return '<div class="row sched-date-row" style="align-items:center;gap:8px;margin-bottom:6px;">'+
+    '<input type="date" class="sched-date-input" value="'+value+'" min="'+minDate+'" max="'+maxDate+'" style="flex:1;">'+
+    '<button class="iconbtn sm" data-act="remove-date-row" title="Remove this date" type="button">✕</button>'+
+  '</div>';
+}
 ACTIONS['open-add-schedule'] = (el)=>{
   const scope = el.dataset.scope; // 'team' | 'personal'
   const year = S.calCursor.getFullYear(), month = S.calCursor.getMonth();
@@ -1569,8 +1658,12 @@ ACTIONS['open-add-schedule'] = (el)=>{
   openModal(
     '<h3>'+title+'</h3>'+
     '<p class="section-sub">'+sub+'</p>'+
-    '<div class="field" style="margin-bottom:14px;"><label>Date</label><input type="date" id="sched-date" value="'+defaultDate+'" min="'+minDate+'" max="'+maxDate+'"></div>'+
-    '<div class="grid cols-2" style="margin-bottom:14px;">'+
+    '<div class="field" style="margin-bottom:6px;"><label>Date(s)</label>'+
+      '<div id="sched-dates-list">'+scheduleDateRowHtml(defaultDate, minDate, maxDate)+'</div>'+
+      '<button class="btn-ghost sm" data-act="add-date-row" data-min="'+minDate+'" data-max="'+maxDate+'" type="button" style="margin-top:2px;">+ Add another date</button>'+
+      '<p class="hint" style="margin:4px 0 0;">Adding more than one date saves the same time and text to each day you pick.</p>'+
+    '</div>'+
+    '<div class="grid cols-2" style="margin:14px 0;">'+
       '<div class="field"><label>From</label><input type="time" id="sched-start"></div>'+
       '<div class="field"><label>To (optional)</label><input type="time" id="sched-end"></div>'+
     '</div>'+
@@ -1581,16 +1674,32 @@ ACTIONS['open-add-schedule'] = (el)=>{
     '</div>'
   );
 };
+ACTIONS['add-date-row'] = (el)=>{
+  const minDate = el.dataset.min, maxDate = el.dataset.max;
+  const list = document.getElementById('sched-dates-list');
+  if(!list) return;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = scheduleDateRowHtml('', minDate, maxDate);
+  list.appendChild(wrap.firstElementChild);
+};
+ACTIONS['remove-date-row'] = (el)=>{
+  const list = document.getElementById('sched-dates-list');
+  if(!list) return;
+  const rows = list.querySelectorAll('.sched-date-row');
+  const row = el.closest('.sched-date-row');
+  if(rows.length > 1 && row) row.remove();
+};
 ACTIONS['add-schedule-item-modal'] = async (el)=>{
   const scope = el.dataset.scope;
-  const date = document.getElementById('sched-date').value;
+  const dateInputs = Array.from(modalEl.querySelectorAll('.sched-date-input'));
+  const dates = Array.from(new Set(dateInputs.map(inp=>inp.value).filter(Boolean)));
   const startVal = document.getElementById('sched-start').value;
   const endVal = document.getElementById('sched-end').value;
   const textVal = document.getElementById('sched-text').value.trim();
-  if(!date || !textVal) return;
+  if(!dates.length || !textVal) return;
   el.disabled = true;
   try{
-    await saveScheduleItem(scope, date, startVal, endVal, textVal);
+    await Promise.all(dates.map(date=>saveScheduleItem(scope, date, startVal, endVal, textVal)));
     closeModal();
     refreshScheduleUI();
   } finally { el.disabled = false; }
@@ -1606,8 +1715,15 @@ ACTIONS['open-day'] = async (el)=>{
   if(!canEditTarget) notes.push('Only '+esc(findProfile(csc).name)+' or Admin can set the target.');
   if(!isAdmin) notes.push('The actual figure can only be updated by Admin.');
   S.cache.openDay = { csc, date };
-  const personalItems = (S.cache.personalScheduleDocs && Array.isArray(S.cache.personalScheduleDocs[date])) ? S.cache.personalScheduleDocs[date] : [];
+  const cscProfile = findProfile(csc);
+  const canSeePersonal = cscProfile ? canSeePersonalFor(cscProfile) : false;
+  const personalItems = canSeePersonal && S.cache.personalScheduleDocs && Array.isArray(S.cache.personalScheduleDocs[date]) ? S.cache.personalScheduleDocs[date] : [];
   const teamItems = (S.cache.scheduleDocs && Array.isArray(S.cache.scheduleDocs[date])) ? S.cache.scheduleDocs[date] : [];
+  const personalSectionHtml = canSeePersonal
+    ? '<div class="card-title">📝 My Schedule</div>'+
+      '<div id="day-schedule-list-personal">'+scheduleListHtml(personalItems, canEditTarget, date, 'personal')+'</div>'
+    : '<div class="card-title">📝 My Schedule</div>'+
+      '<p class="hint" style="margin:0;">🔒 This is private — only '+esc(cscProfile?cscProfile.name:'this person')+' or Admin can see it.</p>';
   openModal(
     '<h3>'+label+'</h3>'+
     '<p class="section-sub">'+esc(findProfile(csc).name)+'</p>'+
@@ -1621,8 +1737,7 @@ ACTIONS['open-day'] = async (el)=>{
       (canEditTarget || isAdmin ? '<button class="btn" data-act="save-day-detail" data-csc="'+csc+'" data-date="'+date+'" data-admin="'+(isAdmin?1:0)+'" data-can-edit-target="'+(canEditTarget?1:0)+'">Save</button>' : '')+
     '</div>'+
     '<div class="divider"></div>'+
-    '<div class="card-title">📝 My Schedule</div>'+
-    '<div id="day-schedule-list-personal">'+scheduleListHtml(personalItems, canEditTarget, date, 'personal')+'</div>'+
+    personalSectionHtml+
     '<div class="divider"></div>'+
     '<div class="card-title">📌 Team Schedule</div>'+
     '<div id="day-schedule-list-team">'+scheduleListHtml(teamItems, isAdmin, date, 'team')+'</div>'
@@ -1633,9 +1748,10 @@ function refreshDayScheduleListIfOpen(){
   if(!open) return;
   const p = findProfile(open.csc);
   const canEditTarget = p ? canEditTargetFor(p) : false;
+  const canSeePersonal = p ? canSeePersonalFor(p) : false;
   const isAdmin = S.role==='admin';
   const personalListEl = document.getElementById('day-schedule-list-personal');
-  if(personalListEl){
+  if(personalListEl && canSeePersonal){
     const items = (S.cache.personalScheduleDocs && Array.isArray(S.cache.personalScheduleDocs[open.date])) ? S.cache.personalScheduleDocs[open.date] : [];
     personalListEl.innerHTML = scheduleListHtml(items, canEditTarget, open.date, 'personal');
   }
@@ -2304,7 +2420,7 @@ function renderAdminPanelContent(todayStr, weekStr){
 
   const profileRows = S.profiles.slice().sort((a,b)=>(a.order||0)-(b.order||0)).map(p=>{
     return '<tr'+(p.active===false?' style="opacity:.5;"':'')+'>'+
-      '<td>'+esc(p.name)+(p.active===false?' <span class="pill neutral">Inactive</span>':'')+'</td>'+
+      '<td>'+esc(p.name)+(p.calendarPin?' <span title="Calendar password set">🔒</span>':'')+(p.active===false?' <span class="pill neutral">Inactive</span>':'')+'</td>'+
       '<td>'+(p.outlets&&p.outlets.length?p.outlets.map(o=>esc(outletName(o))).join(', '):'—')+'</td>'+
       '<td>🏆'+num(p.trophies,0)+' 🤎'+num(p.hearts,0)+'</td>'+
       '<td><button class="btn sm secondary" data-act="edit-profile" data-id="'+p.id+'">Edit</button></td>'+
@@ -2425,6 +2541,8 @@ function openProfileModal(id){
       '</div>'+
       '<div class="field"><label>Or paste a picture link (optional)</label><input type="text" id="photo-url" placeholder="paste a link here if you have one" value="'+esc(p.photoUrl && p.photoUrl.slice(0,5)!=='data:' ? p.photoUrl : '')+'"></div>'+
       '<div class="field"><label>CSC Name</label><input type="text" id="p-name" value="'+esc(p.name)+'" required></div>'+
+      '<div class="field"><label>🔒 Calendar Password (optional)</label><input type="text" id="p-calendar-pin" value="'+esc(p.calendarPin||'')+'" placeholder="Leave blank = no password" autocomplete="off"></div>'+
+      '<p class="hint" style="margin:-8px 0 0;">Only needed if you want to lock '+esc(p.name||'this CSC')+'\'s Calendar tab — anyone entering CSC Mode will need this password to open '+(p.name?esc(p.name)+'\'s':'their')+' My Schedule. Leave blank to allow anyone to pick this name with no password.</p>'+
       '<div class="field"><label>Assigned Outlet(s)</label><div class="stack" style="gap:6px;">'+outletChecks+'</div></div>'+
       (!isNew ? '<label class="row" style="gap:6px;font-weight:600;font-size:13px;"><input type="checkbox" id="p-active" '+(p.active!==false?'checked':'')+'> Active (uncheck to hide temporarily — history is kept)</label>' : '')+
     '</div>'+
@@ -2487,7 +2605,9 @@ ACTIONS['save-profile'] = async (el)=>{
   else if(urlVal){ photoUrl = urlVal; }
   else if(!isNew){ const existing = findProfile(id); photoUrl = existing ? (existing.photoUrl||null) : null; photoAssetId = existing ? (existing.photoAssetId||null) : null; }
 
-  const data = { name: name, outlets: outletsChecked, photoUrl: photoUrl, photoAssetId: photoAssetId };
+  const pinEl = document.getElementById('p-calendar-pin');
+  const calendarPin = pinEl ? pinEl.value.trim() : '';
+  const data = { name: name, outlets: outletsChecked, photoUrl: photoUrl, photoAssetId: photoAssetId, calendarPin: calendarPin };
   if(!isNew) data.active = activeEl ? activeEl.checked : true;
 
   el.disabled = true;
