@@ -797,6 +797,10 @@ html[data-theme="dark"] #app-followup{
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+<!-- lamejs: pure-JS MP3 encoder used by the Training Hub to compress call
+     recordings small enough to store directly in a Firestore field (no
+     Firebase Storage needed). Only touched by the CSC Training Hub code. -->
+<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyC3hWjmkiQa0X9qB7vrnlq8skWH-UWrVjA",
@@ -2969,6 +2973,96 @@ function thCalls(topicKey){ return (S.cache.trainingCalls||[]).filter(c=>c.topic
 function thAllCalls(){ return (S.cache.trainingCalls||[]).slice(); }
 function thNextTopic(){ return TRAINING_TOPICS.find(t=>!thIsPast(t.date)) || null; }
 function thCscNames(){ return activeProfiles().map(p=>p.name); }
+
+/* ---- Training Hub file handling: everything is embedded directly in the
+   Firestore document as a data: URL (same idea as the CSC photo upload above)
+   rather than going through Firebase Storage — Storage was never actually
+   turned on for this project, and re-doing that setup was more than wanted
+   right now. Firestore documents cap out at 1 MiB total, so: material files
+   must be reasonably small already (or pasted as a link instead, which has
+   no size limit), and call recordings are automatically compressed down to a
+   low-bitrate mono MP3 (using lamejs, loaded above) so a multi-minute call
+   can fit — at the cost of sounding noticeably smaller/duller than the
+   original, and a call much past ~10 minutes may not fit even at the lowest
+   quality and will need to be trimmed first. ---- */
+const MATERIAL_MAX_BYTES = 650*1024;
+const AUDIO_TARGET_BYTES = 600*1024;
+function readFileAsDataURL(file){
+  return new Promise((resolve, reject)=>{
+    const r = new FileReader();
+    r.onerror = ()=>reject(r.error);
+    r.onload = ()=>resolve(r.result);
+    r.readAsDataURL(file);
+  });
+}
+function thPcmFromAudioBuffer(buf){
+  const ch0 = buf.getChannelData(0);
+  if(buf.numberOfChannels === 1) return ch0.slice();
+  const ch1 = buf.getChannelData(1);
+  const out = new Float32Array(ch0.length);
+  for(let i=0;i<ch0.length;i++) out[i] = (ch0[i]+ch1[i])/2;
+  return out;
+}
+function thFloatTo16BitPCM(float32){
+  const out = new Int16Array(float32.length);
+  for(let i=0;i<float32.length;i++){
+    const s = Math.max(-1, Math.min(1, float32[i]));
+    out[i] = s < 0 ? s*0x8000 : s*0x7FFF;
+  }
+  return out;
+}
+function thResampleLinear(samples, fromRate, toRate){
+  if(fromRate === toRate) return samples;
+  const ratio = fromRate / toRate;
+  const newLen = Math.max(1, Math.round(samples.length / ratio));
+  const out = new Float32Array(newLen);
+  for(let i=0;i<newLen;i++){
+    const srcIdx = i*ratio;
+    const i0 = Math.floor(srcIdx), i1 = Math.min(i0+1, samples.length-1);
+    const frac = srcIdx - i0;
+    out[i] = samples[i0]*(1-frac) + samples[i1]*frac;
+  }
+  return out;
+}
+// Compresses an audio File down to a small mono MP3 and returns it as a data:
+// URL small enough to store directly in Firestore. Picks the highest of a
+// few low bitrates that should fit AUDIO_TARGET_BYTES for this clip's
+// length; throws {code:'too_long'} if even the lowest bitrate won't fit.
+async function compressAudioToMp3DataUrl(file, onProgress){
+  const BITRATES_KBPS = [32,24,16,12,8];
+  const TARGET_SAMPLE_RATE = 16000; // plenty for speech
+  const arrayBuf = await file.arrayBuffer();
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  const actx = new Ctx();
+  let audioBuf;
+  try{ audioBuf = await actx.decodeAudioData(arrayBuf); }
+  finally{ if(actx.close) actx.close(); }
+  const durationSec = audioBuf.duration;
+  const bitrate = BITRATES_KBPS.find(kb => (kb*1000/8)*durationSec <= AUDIO_TARGET_BYTES);
+  if(!bitrate){ throw Object.assign(new Error('too_long'), { code:'too_long', durationSec }); }
+  let mono = thPcmFromAudioBuffer(audioBuf);
+  mono = thResampleLinear(mono, audioBuf.sampleRate, TARGET_SAMPLE_RATE);
+  const pcm16 = thFloatTo16BitPCM(mono);
+  const encoder = new lamejs.Mp3Encoder(1, TARGET_SAMPLE_RATE, bitrate);
+  const blockSize = 1152;
+  const chunks = [];
+  const total = pcm16.length;
+  for(let i=0;i<total;i+=blockSize){
+    const enc = encoder.encodeBuffer(pcm16.subarray(i, i+blockSize));
+    if(enc && enc.length>0) chunks.push(enc);
+    if(onProgress && (i % (blockSize*60) === 0)) onProgress(Math.min(99, Math.round(i/total*100)));
+    if(i % (blockSize*300) === 0) await new Promise(r=>setTimeout(r,0)); // keep the UI responsive
+  }
+  const last = encoder.flush();
+  if(last && last.length>0) chunks.push(last);
+  const blob = new Blob(chunks, { type:'audio/mp3' });
+  if(onProgress) onProgress(100);
+  if(blob.size > AUDIO_TARGET_BYTES + 50*1024){
+    throw Object.assign(new Error('too_big'), { code:'too_big', bytes: blob.size });
+  }
+  const dataUrl = await readFileAsDataURL(blob);
+  return { dataUrl, bytes: blob.size, bitrate, durationSec };
+}
 function thProgress(){
   const total = TRAINING_TOPICS.length;
   const kDone = TRAINING_TOPICS.filter(t=>thIsPast(t.date)).length;
@@ -3096,7 +3190,11 @@ function thKnowledgeCard(t){
   '</div>';
 }
 function thMaterialUrl(m){
-  return /\.(pptx?|docx?|xlsx?)$/i.test(m.url||'') ? 'https://view.officeapps.live.com/op/view.aspx?src='+encodeURIComponent(m.url) : m.url;
+  // The Office web viewer needs a real fetchable http(s) URL — that only ever
+  // applies to a pasted link (e.g. Google Drive); an uploaded file is embedded
+  // as a data: URL and just opens/downloads directly.
+  if(m.sourceType==='link' && /\.(pptx?|docx?|xlsx?)$/i.test(m.url||'')) return 'https://view.officeapps.live.com/op/view.aspx?src='+encodeURIComponent(m.url);
+  return m.url;
 }
 function thMaterialItem(m){
   return '<div class="th-material">'+
@@ -3295,7 +3393,7 @@ function openMaterialModal(topicKey, existing){
     '<div class="stack" style="margin-top:12px;">'+
       '<div class="field"><label>Material Name</label><input type="text" id="th-mat-name" value="'+esc(existing?existing.name:'')+'" placeholder="e.g. Melasma Training PPT"></div>'+
       '<div class="field"><label>Upload a file</label><input type="file" id="th-mat-file" accept=".ppt,.pptx,.pdf,.doc,.docx,.xls,.xlsx,.key,.png,.jpg,.jpeg">'+
-      '<p class="hint" style="margin:4px 0 0;">PPT, PDF, Word, Excel, Keynote or an image.</p></div>'+
+      '<p class="hint" style="margin:4px 0 0;">PPT, PDF, Word, Excel, Keynote or an image — please keep it under 650KB. 档案比较大的话，改用下面的连结，不受大小限制。</p></div>'+
       '<div class="field"><label>Or paste a link (Google Drive, etc.)</label><input type="text" id="th-mat-link" placeholder="https://…" value="'+esc(existing&&existing.sourceType==='link'?existing.url:'')+'"></div>'+
       '<div id="th-mat-progress" class="hint"></div>'+
     '</div>'+
@@ -3331,11 +3429,14 @@ ACTIONS['th-save-material'] = async (el)=>{
   try{
     const data = { name, topicKey, addedAt: Date.now() };
     if(file){
-      if(!S.assets){ alert('文件上传功能还没设置好（Firebase Storage）。请改用链接，或联系管理员检查设置。'); el.disabled=false; return; }
-      const old = id ? (S.cache.trainingMaterials||[]).find(x=>x.id===id) : null;
-      const { url, path } = await S.assets.uploadFile(file, 'training/materials', p=>{ if(progEl) progEl.textContent = '上传中… '+p+'%'; });
-      data.url = url; data.storagePath = path; data.sourceType = 'upload';
-      if(old && old.storagePath && old.storagePath!==path) S.assets.deleteFile(old.storagePath);
+      if(file.size > MATERIAL_MAX_BYTES){
+        alert('这个档案有点大（'+(file.size/1024/1024).toFixed(1)+' MB），直接存的话会失败。\n\n建议：\n1) 把档案放到 Google Drive 分享出来，把连结贴在下面「Or paste a link」那格（不受大小限制）；\n2) 或者在 PowerPoint/Word 里把图片压缩小一点、重新导出，存档大小控制在 650KB 以内再重新上传。');
+        el.disabled = false; return;
+      }
+      if(progEl) progEl.textContent = '处理中…';
+      data.url = await readFileAsDataURL(file);
+      data.sourceType = 'upload';
+      data.storagePath = null;
     } else if(link){
       data.url = link; data.sourceType = 'link'; data.storagePath = null;
     }
@@ -3356,7 +3457,7 @@ function openCallModal(topicKey, existing, replaceMode){
       '<div class="field"><label>Call Date</label><input type="date" id="th-call-date" value="'+esc(existing?existing.callDate||'':'')+'"></div>'+
       (!replaceMode ? '<div class="field"><label>Notes / Key Learning</label><textarea id="th-call-notes" rows="3">'+esc(existing?existing.notes||'':'')+'</textarea></div>' : '')+
       '<div class="field"><label>'+(existing&&existing.audioUrl?'Replace Audio File':'Audio File')+'</label><input type="file" id="th-call-audio" accept="audio/*">'+
-      (existing&&existing.audioUrl?'<p class="hint" style="margin:4px 0 0;">Leave empty to keep the current recording.</p>':'')+'</div>'+
+      '<p class="hint" style="margin:4px 0 0;">'+(existing&&existing.audioUrl?'Leave empty to keep the current recording. ':'')+'上传后会自动压缩，方便存起来 —— 音质会变小声/闷一点，太长的电话（超过约10分钟）可能需要先剪短。</p>'+'</div>'+
       '<div id="th-call-progress" class="hint"></div>'+
     '</div>'+
     '<div class="spread" style="margin-top:18px;">'+
@@ -3400,10 +3501,24 @@ ACTIONS['th-save-call'] = async (el)=>{
     if(notesEl) data.notes = notesEl.value||'';
     if(!existing) data.uploadedAt = Date.now();
     if(file){
-      if(!S.assets){ alert('文件上传功能还没设置好（Firebase Storage）。请联系管理员检查设置。'); el.disabled=false; return; }
-      const { url, path } = await S.assets.uploadFile(file, 'training/calls', p=>{ if(progEl) progEl.textContent = '上传中… '+p+'%'; });
-      data.audioUrl = url; data.storagePath = path;
-      if(existing && existing.storagePath && existing.storagePath!==path) S.assets.deleteFile(existing.storagePath);
+      if(typeof lamejs === 'undefined'){
+        alert('压缩功能还没加载好，请刷新页面后再试一次。'); el.disabled = false; return;
+      }
+      if(progEl) progEl.textContent = '压缩中… 0%';
+      let result;
+      try{
+        result = await compressAudioToMp3DataUrl(file, p=>{ if(progEl) progEl.textContent = '压缩中… '+p+'%'; });
+      } catch(ce){
+        if(ce && ce.code==='too_long'){
+          alert('这通电话有点长（大约 '+Math.max(1,Math.round(ce.durationSec/60))+' 分钟），压缩到最低音质还是塞不下。\n\n请把录音剪短一点（大约10分钟以内），或分成两段分开上传。');
+        } else if(ce && ce.code==='too_big'){
+          alert('压缩完还是有点大，请把录音剪短一点再试一次。');
+        } else {
+          console.error(ce); alert('这个录音档案没办法处理，请换一个常见格式试试（例如 mp3、m4a、wav）。');
+        }
+        el.disabled = false; return;
+      }
+      data.audioUrl = result.dataUrl; data.audioBytes = result.bytes; data.audioBitrateKbps = result.bitrate; data.storagePath = null;
     }
     if(id) await colTrainingCalls().doc(id).set(data, { merge:true });
     else await colTrainingCalls().doc().set(data);
