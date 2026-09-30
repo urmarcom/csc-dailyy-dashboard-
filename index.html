@@ -956,6 +956,7 @@ function colCallReviews(){ return S.db.collection('callReviews'); }
 // pattern as callReviews/whiteboardPosts above, filtered by topicKey client-side.
 function colTrainingMaterials(){ return S.db.collection('trainingMaterials'); }
 function colTrainingCalls(){ return S.db.collection('trainingCalls'); }
+function colTrainingNotes(){ return S.db.collection('trainingNotes'); }
 
 async function upsert(ref, data){
   // merge:true deep-merges nested maps (e.g. outlets.<id>.tuTarget) and works
@@ -1064,6 +1065,11 @@ async function boot(){
     S.cache.trainingCalls = snap.docs.map(d=>Object.assign({id:d.id}, d.data()));
     renderCaseStudyPane();
   }, err=>{ console.error('training calls sub', err); S.cache.trainingErr = true; renderCaseStudyPane(); }));
+
+  addSubGlobal(colTrainingNotes().onSnapshot(snap=>{
+    S.cache.trainingNotes = snap.docs.map(d=>Object.assign({id:d.id}, d.data()));
+    renderCaseStudyPane();
+  }, err=>{ console.error('training notes sub', err); S.cache.trainingErr = true; renderCaseStudyPane(); }));
 
   renderCaseStudyPane();
 
@@ -3081,6 +3087,208 @@ function thCallsLabel(topicKey){
   const n = thCalls(topicKey).length;
   return n===0 ? 'No Call Uploaded' : (n+' Call'+(n>1?'s':'')+' Available');
 }
+
+/* ---- Training Notes System — stored the same way as everything else in the
+   Hub (a flat Firestore collection, trainingNotes, no Storage involved) since
+   note text is always tiny. The editor is a plain contenteditable div driven
+   by document.execCommand — no external rich-text library — and everything
+   that gets saved passes through thSanitizeHtml() first, which only lets a
+   small fixed allowlist of tags/attributes through. ---- */
+const NOTE_TYPES = [
+  { key:'knowledge',   label:'Knowledge Note',          emoji:'📚', color:'#2F5F86', bg:'#E3EEF7' },
+  { key:'call',        label:'Call Learning',           emoji:'📞', color:'#1E7A5C', bg:'#E1F3EC' },
+  { key:'keylearning', label:'Key Learning',            emoji:'💡', color:'#8A6D1D', bg:'#FBF0D6' },
+  { key:'mistake',     label:'Common Mistake',          emoji:'⚠️', color:'#B23B3B', bg:'#FBE6E6' },
+  { key:'phrase',      label:'Good Question / Phrase',  emoji:'💬', color:'#6B3F8E', bg:'#EFE6F7' },
+  { key:'doctor',      label:'Doctor Explanation',      emoji:'🩺', color:'#2F6F6F', bg:'#E1F0F0' },
+  { key:'action',      label:'Action Point',            emoji:'🎯', color:'#B2601E', bg:'#FCEBDC' },
+];
+function thNoteTypeMeta(key){ return NOTE_TYPES.find(n=>n.key===key) || NOTE_TYPES[0]; }
+function thAllNotes(){ return (S.cache.trainingNotes||[]).slice(); }
+function thNoteSortFn(a,b){
+  const pa = a.pinned?1:0, pb = b.pinned?1:0;
+  if(pa!==pb) return pb-pa;
+  return (b.updatedAt||b.createdAt||0) - (a.updatedAt||a.createdAt||0);
+}
+function thNotesFor(topicKey){ return thAllNotes().filter(n=>n.topicKey===topicKey).sort(thNoteSortFn); }
+function thNotesForCall(callId){ return thAllNotes().filter(n=>n.relatedCallId===callId).sort((a,b)=>(a.callTimestamp||0)-(b.callTimestamp||0)); }
+function thFmtTimestamp(sec){
+  sec = Math.max(0, Math.round(sec||0));
+  const m = Math.floor(sec/60), s = sec%60;
+  return m+':'+String(s).padStart(2,'0');
+}
+function thAuthorName(){
+  if(S.role==='admin') return 'Admin';
+  if(S.role==='csc' && S.myCscId){ const p = findProfile(S.myCscId); if(p) return p.name; }
+  return 'CSC';
+}
+function thPlainText(html){
+  const tpl = document.createElement('template');
+  tpl.innerHTML = html||'';
+  return (tpl.content.textContent||'').replace(/\s+/g,' ').trim();
+}
+const TH_ALLOWED_TAGS = {B:1,STRONG:1,I:1,EM:1,U:1,MARK:1,H2:1,H3:1,UL:1,OL:1,LI:1,BLOCKQUOTE:1,HR:1,BR:1,DIV:1,SPAN:1,P:1};
+// Allowlist HTML sanitizer for note content: removes dangerous tags outright,
+// unwraps anything else not on the list (keeping its text/children), and
+// strips every attribute except the few we actually use ourselves (the
+// checklist class on UL/LI, and a background-color-only style on
+// SPAN/MARK for the highlight tool).
+function thSanitizeHtml(html){
+  const tpl = document.createElement('template');
+  tpl.innerHTML = html||'';
+  (function walk(container){
+    Array.from(container.childNodes).forEach(node=>{
+      if(node.nodeType === 1){
+        const tag = node.tagName;
+        if(tag==='SCRIPT'||tag==='STYLE'||tag==='IFRAME'||tag==='OBJECT'||tag==='EMBED'||tag==='LINK'||tag==='META'){
+          node.remove(); return;
+        }
+        if(!TH_ALLOWED_TAGS[tag]){
+          while(node.firstChild) container.insertBefore(node.firstChild, node);
+          container.removeChild(node);
+          return;
+        }
+        if(tag==='UL'){
+          const cls = node.getAttribute('class')||'';
+          Array.from(node.attributes).forEach(a=>node.removeAttribute(a.name));
+          if(cls.indexOf('th-checklist')!==-1) node.setAttribute('class','th-checklist');
+        } else if(tag==='LI'){
+          const cls = node.getAttribute('class')||'';
+          Array.from(node.attributes).forEach(a=>node.removeAttribute(a.name));
+          if(cls.indexOf('th-checked')!==-1) node.setAttribute('class','th-checked');
+        } else if(tag==='SPAN'||tag==='MARK'){
+          const style = node.getAttribute('style')||'';
+          const m = /background-color:\s*(rgb\([\d,\s]+\)|#[0-9a-fA-F]{3,6})/.exec(style);
+          Array.from(node.attributes).forEach(a=>node.removeAttribute(a.name));
+          if(m) node.setAttribute('style', 'background-color:'+m[1]+';');
+        } else {
+          Array.from(node.attributes).forEach(a=>node.removeAttribute(a.name));
+        }
+        walk(node);
+      } else if(node.nodeType !== 3){
+        node.remove();
+      }
+    });
+  })(tpl.content);
+  return tpl.innerHTML;
+}
+// Renders a note's sanitized HTML and, for any checklist, injects a clickable
+// checkbox glyph in front of each <li> (indexed in document order — the same
+// order ACTIONS['th-note-toggle-check'] uses to find which one to flip).
+function thRenderNoteBody(n){
+  const safe = thSanitizeHtml(n.content||'');
+  let idx = 0;
+  return safe.replace(/<ul class="th-checklist">([\s\S]*?)<\/ul>/g, (whole, inner)=>{
+    const newInner = inner.replace(/<li( class="th-checked")?>/g, (m, checkedAttr)=>{
+      const box = '<span class="th-checkbox" data-act="th-note-toggle-check" data-id="'+n.id+'" data-idx="'+(idx++)+'">'+(checkedAttr?'☑':'☐')+'</span>';
+      return '<li'+(checkedAttr||'')+'>'+box;
+    });
+    return '<ul class="th-checklist">'+newInner+'</ul>';
+  });
+}
+function thNoteSummaryCounts(notes){
+  const counts = {};
+  NOTE_TYPES.forEach(nt=>counts[nt.key]=0);
+  notes.forEach(n=>{ if(counts[n.noteType]!=null) counts[n.noteType]++; });
+  return counts;
+}
+function thNoteSummaryHtml(notes){
+  const counts = thNoteSummaryCounts(notes);
+  const chips = NOTE_TYPES.filter(nt=>counts[nt.key]>0).map(nt=>
+    '<span class="th-sumchip" style="background:'+nt.bg+';color:'+nt.color+';">'+nt.emoji+' '+nt.label+' · '+counts[nt.key]+'</span>'
+  ).join('');
+  return chips ? '<div class="th-notesummary">'+chips+'</div>' : '';
+}
+function thKeyTakeaways(notes){
+  const pinned = notes.filter(n=>n.pinned);
+  const list = (pinned.length ? pinned : notes.filter(n=>n.noteType==='keylearning')).slice(0,6);
+  if(!list.length) return '';
+  return '<div class="th-takeaways"><div class="th-tw-title">⭐ Key Takeaways</div><ul>'+
+    list.map(n=>'<li>'+esc((n.title||thPlainText(n.content)).slice(0,140))+'</li>').join('')+
+  '</ul></div>';
+}
+function thNoteDateLabel(n){
+  const d = new Date(n.updatedAt||n.createdAt||Date.now());
+  return d.toLocaleDateString()+((n.updatedAt&&n.createdAt&&n.updatedAt!==n.createdAt)?' (edited)':'');
+}
+function thNoteCard(n, hideTopic){
+  const meta = thNoteTypeMeta(n.noteType);
+  const t = thTopic(n.topicKey);
+  const call = n.relatedCallId ? (S.cache.trainingCalls||[]).find(x=>x.id===n.relatedCallId) : null;
+  return '<div class="th-notecard">'+
+    '<div class="th-notehead">'+
+      '<span class="th-notebadge" style="background:'+meta.bg+';color:'+meta.color+';">'+meta.emoji+' '+esc(meta.label)+'</span>'+
+      (n.pinned ? '<span class="th-pinbadge">📌 Pinned</span>' : '')+
+      '<div class="row" style="gap:4px;margin-left:auto;">'+
+        '<button class="iconbtn sm" data-act="th-note-pin" data-id="'+esc(n.id)+'" title="'+(n.pinned?'Unpin':'Pin')+'">📌</button>'+
+        '<button class="iconbtn sm" data-act="th-note-edit" data-id="'+esc(n.id)+'" title="Edit">✏️</button>'+
+        '<button class="iconbtn sm" data-act="th-note-delete" data-id="'+esc(n.id)+'" title="Delete">🗑</button>'+
+      '</div>'+
+    '</div>'+
+    (n.title ? '<div class="th-notetitle">'+esc(n.title)+'</div>' : '')+
+    '<div class="th-notebody">'+thRenderNoteBody(n)+'</div>'+
+    '<div class="th-notemeta">'+
+      (!hideTopic && t ? 'Topic: '+esc(t.name)+' · ' : '')+
+      (call ? '📞 '+esc(call.caseName||'')+(n.callTimestamp!=null?' <span class="th-ts" data-act="th-note-jump" data-id="'+esc(n.id)+'">⏱ '+thFmtTimestamp(n.callTimestamp)+'</span>':'')+' · ' : '')+
+      esc(n.author||'CSC')+' · '+thNoteDateLabel(n)+
+    '</div>'+
+  '</div>';
+}
+function thNoteChip(n){
+  const meta = thNoteTypeMeta(n.noteType);
+  return '<div class="th-notechip" data-act="th-note-edit" data-id="'+esc(n.id)+'">'+
+    (n.callTimestamp!=null ? '<span class="th-ts" data-act="th-note-jump" data-id="'+esc(n.id)+'">⏱ '+thFmtTimestamp(n.callTimestamp)+'</span>' : '')+
+    '<span class="th-chip-badge" style="background:'+meta.bg+';color:'+meta.color+';">'+meta.emoji+'</span>'+
+    '<span class="th-chip-text">'+esc((n.title||thPlainText(n.content)||'(no text)').slice(0,60))+'</span>'+
+  '</div>';
+}
+function thNotesSection(topicKey){
+  const notes = thNotesFor(topicKey);
+  return '<div class="card" style="margin-top:16px;">'+
+    '<div class="spread" style="align-items:flex-start;flex-wrap:wrap;gap:8px;">'+
+      '<div class="card-title" style="margin:0;">📝 Notes</div>'+
+      '<button class="btn sm secondary" data-act="th-note-add-knowledge" data-key="'+esc(topicKey)+'">+ Add Note</button>'+
+    '</div>'+
+    (notes.length ? thNoteSummaryHtml(notes) : '')+
+    (notes.length ? thKeyTakeaways(notes) : '')+
+    (notes.length ? notes.map(n=>thNoteCard(n,true)).join('') : '<p class="hint" style="margin:8px 0 0;">还没有笔记。学完 Knowledge 或者听完 Call 之后，可以在这里记录重点。</p>')+
+  '</div>';
+}
+function thNotesLibraryView(){
+  const q = (S.cache.thNotesSearch||'').trim().toLowerCase();
+  const fTopic = S.cache.thNotesFilterTopic||'';
+  const fType = S.cache.thNotesFilterType||'';
+  const fSource = S.cache.thNotesFilterSource||'';
+  const fPinned = !!S.cache.thNotesFilterPinned;
+  const list = thAllNotes().filter(n=>{
+    if(fTopic && n.topicKey!==fTopic) return false;
+    if(fType && n.noteType!==fType) return false;
+    if(fSource && n.sourceType!==fSource) return false;
+    if(fPinned && !n.pinned) return false;
+    if(q){
+      const t = thTopic(n.topicKey);
+      const call = n.relatedCallId ? (S.cache.trainingCalls||[]).find(x=>x.id===n.relatedCallId) : null;
+      const hay = [(n.title||''), thPlainText(n.content), (t?t.name:''), (call?call.caseName:''), (call?call.csc:'')].join(' ').toLowerCase();
+      if(hay.indexOf(q)===-1) return false;
+    }
+    return true;
+  }).sort(thNoteSortFn);
+  const filterBar =
+    '<div class="th-filterbar">'+
+      '<input type="text" id="th-notes-search-input" placeholder="Search notes, topic, call, CSC…" value="'+esc(S.cache.thNotesSearch||'')+'" data-act-input="th-notes-search">'+
+      '<select data-act-change="th-notes-filter-topic"><option value="">All Topics</option>'+TRAINING_TOPICS.map(t=>'<option value="'+t.key+'"'+(fTopic===t.key?' selected':'')+'>'+esc(t.name)+'</option>').join('')+'</select>'+
+      '<select data-act-change="th-notes-filter-type"><option value="">All Note Types</option>'+NOTE_TYPES.map(nt=>'<option value="'+nt.key+'"'+(fType===nt.key?' selected':'')+'>'+nt.emoji+' '+esc(nt.label)+'</option>').join('')+'</select>'+
+      '<select data-act-change="th-notes-filter-source"><option value="">Knowledge + Skills</option><option value="knowledge"'+(fSource==='knowledge'?' selected':'')+'>📚 Knowledge Only</option><option value="skills"'+(fSource==='skills'?' selected':'')+'>🎧 Skills Only</option></select>'+
+      '<label class="row" style="gap:5px;font-size:12.5px;align-items:center;padding:0 4px;"><input type="checkbox" id="th-notes-pinned-cb" data-act-change="th-notes-filter-pinned"'+(fPinned?' checked':'')+'> 📌 Pinned Only</label>'+
+    '</div>';
+  return (
+    '<div class="th-back"><button class="btn-ghost" data-act="th-nav" data-view="home">← Training Hub</button></div>'+
+    '<div class="section-title">📝 Notes Library</div>'+
+    '<p class="section-sub">我们的 CSC 内部学习笔记库 —— 全部 topic 的重点、易错点、好问题都整理在这里。</p>'+
+    filterBar+
+    (list.length ? list.map(n=>thNoteCard(n,false)).join('') : '<div class="card empty-state">No matching notes.</div>')
+  );
+}
 function thStyles(){
   return '<style>'+
   '.th-hero{background:linear-gradient(135deg,var(--accent-soft),var(--surface));border:1px solid var(--border);border-radius:var(--radius-lg);padding:22px 24px;margin-bottom:16px;}'+
@@ -3124,6 +3332,35 @@ function thStyles(){
   '.th-topicsection{margin-bottom:22px;}'+
   '.th-topicsection h3{font-family:"Baloo 2",sans-serif;font-size:16px;margin:0 0 10px;display:flex;align-items:center;gap:8px;}'+
   '.th-legacy-link{font-size:12px;color:var(--ink-faint);text-decoration:underline;cursor:pointer;}'+
+  '.th-toolbar{display:flex;gap:2px;flex-wrap:wrap;align-items:center;padding:6px;border:1px solid var(--border);border-bottom:none;border-radius:10px 10px 0 0;background:var(--surface-alt);}'+
+  '.th-toolbar button{border:1px solid transparent;background:transparent;border-radius:6px;padding:5px 9px;font-size:12.5px;font-weight:700;cursor:pointer;color:var(--ink);line-height:1;}'+
+  '.th-toolbar button:hover{background:var(--surface);border-color:var(--border);}'+
+  '.th-tb-sep{width:1px;align-self:stretch;background:var(--border);margin:2px 4px;}'+
+  '.th-editor{min-height:110px;max-height:320px;overflow:auto;border:1px solid var(--border);border-radius:0 0 10px 10px;padding:10px 12px;font-size:13.5px;line-height:1.6;background:var(--surface);color:var(--ink);}'+
+  '.th-editor:focus{outline:none;border-color:var(--gold);}'+
+  '.th-editor h2{font-size:16px;margin:8px 0 4px;}.th-editor h3{font-size:14px;margin:6px 0 4px;}'+
+  '.th-editor blockquote,.th-notebody blockquote{margin:6px 0;padding:6px 12px;border-left:3px solid var(--gold);background:var(--surface-alt);border-radius:0 8px 8px 0;}'+
+  '.th-editor ul.th-checklist,.th-notebody ul.th-checklist{list-style:none;padding-left:2px;}'+
+  '.th-notebody ul.th-checklist li{display:flex;align-items:flex-start;gap:6px;}'+
+  '.th-checkbox{cursor:pointer;flex-shrink:0;}'+
+  '.th-notecard{border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:8px;background:var(--surface);}'+
+  '.th-notehead{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}'+
+  '.th-notebadge{font-size:11px;font-weight:800;border-radius:999px;padding:3px 9px;white-space:nowrap;}'+
+  '.th-pinbadge{font-size:11px;font-weight:800;color:var(--gold);}'+
+  '.th-notetitle{font-weight:700;font-size:13.5px;margin-top:6px;}'+
+  '.th-notebody{font-size:13px;line-height:1.6;margin-top:4px;}'+
+  '.th-notemeta{font-size:11px;color:var(--ink-faint);margin-top:6px;}'+
+  '.th-ts{font-weight:700;color:var(--accent-soft-ink);cursor:pointer;text-decoration:underline;}'+
+  '.th-notesummary{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 6px;}'+
+  '.th-sumchip{font-size:11px;font-weight:800;border-radius:999px;padding:3px 9px;white-space:nowrap;}'+
+  '.th-takeaways{background:var(--accent-soft);border-radius:12px;padding:10px 14px;margin:6px 0 12px;}'+
+  '.th-tw-title{font-size:12px;font-weight:800;color:var(--accent-soft-ink);margin-bottom:4px;}'+
+  '.th-takeaways ul{margin:0;padding-left:18px;font-size:13px;line-height:1.6;}'+
+  '.th-notemini-list{margin-top:8px;display:flex;flex-direction:column;gap:6px;}'+
+  '.th-notechip{display:flex;align-items:center;gap:6px;font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:10px;cursor:pointer;background:var(--surface-alt);}'+
+  '.th-notechip:hover{border-color:var(--gold);}'+
+  '.th-chip-badge{border-radius:999px;padding:1px 6px;font-size:12px;}'+
+  '.th-chip-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}'+
   '@media (max-width:760px){.th-statgrid{grid-template-columns:repeat(2,1fr);}.th-navbtn{min-width:100%;}}'+
   '</style>';
 }
@@ -3155,6 +3392,7 @@ function thHomeView(){
     '<div class="th-navrow">'+
       '<button class="th-navbtn" data-act="th-nav" data-view="knowledge"><span class="ic">📚</span>Knowledge</button>'+
       '<button class="th-navbtn" data-act="th-nav" data-view="skills"><span class="ic">🎧</span>Skills</button>'+
+      '<button class="th-navbtn" data-act="th-nav" data-view="notes"><span class="ic">📝</span>Notes Library'+(thAllNotes().length?' ('+thAllNotes().length+')':'')+'</button>'+
     '</div>'+
     '<div class="section-title" style="font-size:16px;">Training Topics</div>'+
     '<div class="th-topicgrid">'+TRAINING_TOPICS.map(thTopicCardHome).join('')+'</div>'
@@ -3268,9 +3506,12 @@ function thCallCard(c, showTopicBadge){
     '</div></div>'+
     (c.audioUrl ?
       '<div class="th-player"><audio id="'+audioId+'" controls preload="metadata" src="'+esc(c.audioUrl)+'"></audio>'+
-      '<div class="th-speedrow">'+speeds.map(s=>'<button type="button" class="th-speedbtn'+(s===1?' active':'')+'" data-act="th-speed" data-audio="'+audioId+'" data-speed="'+s+'">'+s+'x</button>').join('')+'</div></div>'
+      '<div class="th-speedrow">'+speeds.map(s=>'<button type="button" class="th-speedbtn'+(s===1?' active':'')+'" data-act="th-speed" data-audio="'+audioId+'" data-speed="'+s+'">'+s+'x</button>').join('')+
+      '<button type="button" class="btn sm secondary" style="margin-left:auto;" data-act="th-note-add-call" data-id="'+esc(c.id)+'">📝 + Note at current time</button>'+
+      '</div></div>'
     : '<p class="hint">No audio uploaded.</p>')+
     (c.notes ? '<div class="th-notes">'+esc(c.notes)+'</div>' : '')+
+    (thNotesForCall(c.id).length ? '<div class="th-notemini-list">'+thNotesForCall(c.id).map(thNoteChip).join('')+'</div>' : '')+
   '</div>';
 }
 function thTopicView(key){
@@ -3296,7 +3537,8 @@ function thTopicView(key){
       '<div class="card-title">🎧 Skills — Case Study Calls · '+esc(t.sTime)+' · '+esc(t.sPic)+'</div>'+
       (calls.length ? calls.map(c=>thCallCard(c,false)).join('') : '<p class="hint" style="margin:2px 0 12px;">还没有上传录音</p>')+
       '<button class="btn sm secondary" data-act="th-add-call" data-key="'+t.key+'">+ Add New Call</button>'+
-    '</div>'
+    '</div>'+
+    thNotesSection(t.key)
   );
 }
 function renderLegacyCallReviewView(el){
@@ -3349,10 +3591,12 @@ function renderCaseStudyPane(){
   const view = S.cache.thView || 'home';
   if(view === 'legacy-cr'){ renderLegacyCallReviewView(el); return; }
   const activeId = document.activeElement && document.activeElement.id;
-  const selStart = (activeId==='th-search-input' && document.activeElement.selectionStart!=null) ? document.activeElement.selectionStart : null;
+  const isSearchFocus = (activeId==='th-search-input' || activeId==='th-notes-search-input');
+  const selStart = (isSearchFocus && document.activeElement.selectionStart!=null) ? document.activeElement.selectionStart : null;
   let body;
   if(view === 'knowledge') body = thKnowledgeView();
   else if(view === 'skills') body = thSkillsView();
+  else if(view === 'notes') body = thNotesLibraryView();
   else if(view.indexOf('topic:')===0) body = thTopicView(view.slice(6));
   else body = thHomeView();
   el.innerHTML = thStyles()+
@@ -3365,8 +3609,8 @@ function renderCaseStudyPane(){
       '</div></div>'+
       body+
     '</div>';
-  if(activeId==='th-search-input'){
-    const inp = document.getElementById('th-search-input');
+  if(isSearchFocus){
+    const inp = document.getElementById(activeId);
     if(inp){ inp.focus(); if(selStart!=null) inp.setSelectionRange(selStart, selStart); }
   }
 }
@@ -3525,6 +3769,175 @@ ACTIONS['th-save-call'] = async (el)=>{
     closeModal(); toast('已保存');
   } catch(e){ console.error(e); alert('保存失败，请重试。'); }
   finally { el.disabled = false; }
+};
+ACTIONS['th-notes-search'] = (el)=>{ S.cache.thNotesSearch = el.value; renderCaseStudyPane(); };
+ACTIONS['th-notes-filter-topic'] = (el)=>{ S.cache.thNotesFilterTopic = el.value; renderCaseStudyPane(); };
+ACTIONS['th-notes-filter-type'] = (el)=>{ S.cache.thNotesFilterType = el.value; renderCaseStudyPane(); };
+ACTIONS['th-notes-filter-source'] = (el)=>{ S.cache.thNotesFilterSource = el.value; renderCaseStudyPane(); };
+ACTIONS['th-notes-filter-pinned'] = (el)=>{ S.cache.thNotesFilterPinned = el.checked; renderCaseStudyPane(); };
+
+/* ---- Rich-text note editor toolbar. execCommand is old and a little
+   deprecated but still works everywhere and needs zero external library —
+   fine for the handful of simple formatting actions we actually need. Each
+   toolbar button is mousedown-preventDefault'd (see the listener right
+   below the ACTIONS map) so clicking it never steals focus/selection away
+   from the editor div first. ---- */
+const TH_NOTE_CMDS = {
+  bold: ()=>document.execCommand('bold'),
+  italic: ()=>document.execCommand('italic'),
+  highlight: ()=>document.execCommand('hiliteColor', false, '#FDE68A'),
+  h1: ()=>document.execCommand('formatBlock', false, 'H2'),
+  h2: ()=>document.execCommand('formatBlock', false, 'H3'),
+  ul: ()=>document.execCommand('insertUnorderedList'),
+  ol: ()=>document.execCommand('insertOrderedList'),
+  quote: ()=>document.execCommand('formatBlock', false, 'BLOCKQUOTE'),
+  hr: ()=>document.execCommand('insertHorizontalRule'),
+  checklist: ()=>{
+    document.execCommand('insertUnorderedList');
+    const sel = window.getSelection();
+    if(sel && sel.rangeCount){
+      let node = sel.getRangeAt(0).startContainer;
+      if(node.nodeType===3) node = node.parentNode;
+      const li = node.closest ? node.closest('li') : null;
+      const ul = li ? li.closest('ul') : (node.closest ? node.closest('ul') : null);
+      if(ul) ul.classList.add('th-checklist');
+    }
+  },
+};
+document.addEventListener('mousedown', (e)=>{
+  if(e.target.closest('[data-act="th-note-cmd"]')) e.preventDefault();
+});
+ACTIONS['th-note-cmd'] = (el)=>{
+  const fn = TH_NOTE_CMDS[el.dataset.cmd];
+  if(fn){ fn(); const ed = document.getElementById('th-note-editor'); if(ed) ed.focus(); }
+};
+function thNoteToolbarHtml(){
+  return '<div class="th-toolbar">'+
+    '<button type="button" data-act="th-note-cmd" data-cmd="bold" title="Bold"><b>B</b></button>'+
+    '<button type="button" data-act="th-note-cmd" data-cmd="italic" title="Italic"><i>I</i></button>'+
+    '<button type="button" data-act="th-note-cmd" data-cmd="highlight" title="Highlight">🖍</button>'+
+    '<span class="th-tb-sep"></span>'+
+    '<button type="button" data-act="th-note-cmd" data-cmd="h1" title="Heading">H1</button>'+
+    '<button type="button" data-act="th-note-cmd" data-cmd="h2" title="Subheading">H2</button>'+
+    '<span class="th-tb-sep"></span>'+
+    '<button type="button" data-act="th-note-cmd" data-cmd="ul" title="Bullet List">• List</button>'+
+    '<button type="button" data-act="th-note-cmd" data-cmd="ol" title="Numbered List">1. List</button>'+
+    '<button type="button" data-act="th-note-cmd" data-cmd="checklist" title="Checklist">☑ Check</button>'+
+    '<span class="th-tb-sep"></span>'+
+    '<button type="button" data-act="th-note-cmd" data-cmd="quote" title="Important Point">❝ Quote</button>'+
+    '<button type="button" data-act="th-note-cmd" data-cmd="hr" title="Divider">― Divider</button>'+
+  '</div>';
+}
+function openNoteModal(opts){
+  opts = opts || {};
+  const editing = opts.existing || null;
+  const typeVal = editing ? editing.noteType : (opts.sourceType==='skills' ? 'call' : 'knowledge');
+  const call = opts.relatedCallId ? (S.cache.trainingCalls||[]).find(x=>x.id===opts.relatedCallId) : null;
+  const ts = editing ? editing.callTimestamp : opts.callTimestamp;
+  openModal(
+    '<h3>'+(editing?'Edit Note':'📝 + Add Note')+'</h3>'+
+    '<div class="stack" style="margin-top:12px;">'+
+      '<div class="field"><label>Note Type</label><select id="th-note-type">'+NOTE_TYPES.map(nt=>'<option value="'+nt.key+'"'+(typeVal===nt.key?' selected':'')+'>'+nt.emoji+' '+esc(nt.label)+'</option>').join('')+'</select></div>'+
+      '<div class="field"><label>Title (optional)</label><input type="text" id="th-note-title" value="'+esc(editing?editing.title||'':'')+'" placeholder="Short title…"></div>'+
+      (call ? '<p class="hint" style="margin:0;">📞 Related Call: '+esc(call.caseName||'')+(ts!=null?' &nbsp;·&nbsp; ⏱ '+thFmtTimestamp(ts):'')+'</p>' : '')+
+      '<div class="field"><label>Note</label>'+
+        thNoteToolbarHtml()+
+        '<div id="th-note-editor" class="th-editor" contenteditable="true">'+(editing?thSanitizeHtml(editing.content||''):'')+'</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="spread" style="margin-top:18px;">'+
+      (editing?'<button class="btn danger sm" data-act="th-note-delete" data-id="'+esc(editing.id)+'">Delete</button>':'<span></span>')+
+      '<div class="row" style="gap:8px;"><button class="btn secondary" data-act="modal-close">Cancel</button>'+
+      '<button class="btn" data-act="th-note-save" '+
+        'data-id="'+(editing?esc(editing.id):'')+'" '+
+        'data-topic="'+esc(editing?editing.topicKey:(opts.topicKey||''))+'" '+
+        'data-source="'+esc(editing?editing.sourceType:(opts.sourceType||'knowledge'))+'" '+
+        'data-call="'+esc(editing?(editing.relatedCallId||''):(opts.relatedCallId||''))+'" '+
+        'data-ts="'+(ts!=null?ts:'')+'">Save</button></div>'+
+    '</div>'
+  );
+  setTimeout(()=>{ const ed = document.getElementById('th-note-editor'); if(ed) ed.focus(); }, 50);
+}
+ACTIONS['th-note-add-knowledge'] = (el)=>{ openNoteModal({ topicKey: el.dataset.key, sourceType:'knowledge' }); };
+ACTIONS['th-note-add-call'] = (el)=>{
+  const c = (S.cache.trainingCalls||[]).find(x=>x.id===el.dataset.id);
+  if(!c) return;
+  let ts = null;
+  const audio = document.getElementById('th-audio-'+c.id);
+  if(audio && !isNaN(audio.currentTime)) ts = audio.currentTime;
+  openNoteModal({ topicKey:c.topicKey, sourceType:'skills', relatedCallId:c.id, callTimestamp: ts });
+};
+ACTIONS['th-note-edit'] = (el)=>{
+  const n = thAllNotes().find(x=>x.id===el.dataset.id);
+  if(n) openNoteModal({ existing:n });
+};
+ACTIONS['th-note-save'] = async (el)=>{
+  const id = el.dataset.id;
+  const editorEl = document.getElementById('th-note-editor');
+  const rawHtml = editorEl ? editorEl.innerHTML : '';
+  const plain = thPlainText(rawHtml);
+  if(!plain){ alert('Please write something before saving.'); return; }
+  const html = thSanitizeHtml(rawHtml);
+  const noteType = document.getElementById('th-note-type').value;
+  const title = (document.getElementById('th-note-title').value||'').trim();
+  const topicKey = el.dataset.topic;
+  const sourceType = el.dataset.source;
+  const relatedCallId = el.dataset.call || null;
+  const tsRaw = el.dataset.ts;
+  const callTimestamp = (tsRaw!=='' && tsRaw!=null) ? Number(tsRaw) : null;
+  el.disabled = true;
+  try{
+    const data = { topicKey, sourceType, noteType, title, content: html, relatedCallId, callTimestamp, updatedAt: Date.now() };
+    if(id){
+      await colTrainingNotes().doc(id).set(data, { merge:true });
+    } else {
+      data.createdAt = Date.now();
+      data.pinned = false;
+      data.author = thAuthorName();
+      await colTrainingNotes().doc().set(data);
+    }
+    closeModal(); toast('已保存');
+  } catch(e){ console.error(e); alert('保存失败，请重试。'); }
+  finally { el.disabled = false; }
+};
+ACTIONS['th-note-delete'] = async (el)=>{
+  if(!confirm('Delete this note? This can\'t be undone.')) return;
+  closeModal();
+  await colTrainingNotes().doc(el.dataset.id).delete();
+};
+ACTIONS['th-note-pin'] = async (el)=>{
+  const n = thAllNotes().find(x=>x.id===el.dataset.id);
+  if(!n) return;
+  await colTrainingNotes().doc(n.id).set({ pinned: !n.pinned }, { merge:true });
+};
+ACTIONS['th-note-toggle-check'] = async (el)=>{
+  const n = thAllNotes().find(x=>x.id===el.dataset.id);
+  if(!n) return;
+  const targetIdx = Number(el.dataset.idx);
+  let counter = -1;
+  const newContent = thSanitizeHtml(n.content||'').replace(/<ul class="th-checklist">([\s\S]*?)<\/ul>/g, (whole, inner)=>{
+    const newInner = inner.replace(/<li( class="th-checked")?>/g, (m, checkedAttr)=>{
+      counter++;
+      if(counter !== targetIdx) return m;
+      return checkedAttr ? '<li>' : '<li class="th-checked">';
+    });
+    return '<ul class="th-checklist">'+newInner+'</ul>';
+  });
+  await colTrainingNotes().doc(n.id).set({ content: newContent, updatedAt: Date.now() }, { merge:true });
+};
+ACTIONS['th-note-jump'] = (el)=>{
+  const n = thAllNotes().find(x=>x.id===el.dataset.id);
+  if(!n || !n.relatedCallId) return;
+  S.cache.thView = 'topic:'+n.topicKey;
+  renderCaseStudyPane();
+  setTimeout(()=>{
+    const audio = document.getElementById('th-audio-'+n.relatedCallId);
+    if(audio){
+      audio.currentTime = n.callTimestamp||0;
+      audio.play().catch(()=>{});
+      if(audio.scrollIntoView) audio.scrollIntoView({behavior:'smooth', block:'center'});
+    }
+  }, 60);
 };
 
 /* =========================================================
