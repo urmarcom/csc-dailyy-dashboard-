@@ -957,6 +957,13 @@ function colCallReviews(){ return S.db.collection('callReviews'); }
 function colTrainingMaterials(){ return S.db.collection('trainingMaterials'); }
 function colTrainingCalls(){ return S.db.collection('trainingCalls'); }
 function colTrainingNotes(){ return S.db.collection('trainingNotes'); }
+// Large uploaded files (Knowledge materials / Skills transcripts) over the
+// single-document safe size get split across several docs here instead —
+// Firestore caps a whole document at ~1MiB, and Storage was never turned on
+// for this project (see MATERIAL_MAX_BYTES / CHUNK_CHARS below). Chunk doc
+// ids are deterministic ("<materialId>_<index>") so they can be read/deleted
+// directly by id, with no query needed.
+function colFileChunks(){ return S.db.collection('trainingFileChunks'); }
 
 async function upsert(ref, data){
   // merge:true deep-merges nested maps (e.g. outlets.<id>.tuTarget) and works
@@ -2998,6 +3005,12 @@ function thCscNames(){ return activeProfiles().map(p=>p.name); }
    quality and will need to be trimmed first. ---- */
 const MATERIAL_MAX_BYTES = 650*1024;
 const AUDIO_TARGET_BYTES = 600*1024;
+// A file bigger than MATERIAL_MAX_BYTES but under this gets auto-split across
+// several trainingFileChunks docs instead of refusing it outright (see
+// colFileChunks() above). CHUNK_CHARS keeps each chunk doc comfortably under
+// Firestore's ~1MiB-per-document cap even with its base64 overhead.
+const MAX_CHUNKED_FILE_BYTES = 8*1024*1024;
+const CHUNK_CHARS = 700*1024;
 function readFileAsDataURL(file){
   return new Promise((resolve, reject)=>{
     const r = new FileReader();
@@ -3005,6 +3018,33 @@ function readFileAsDataURL(file){
     r.onload = ()=>resolve(r.result);
     r.readAsDataURL(file);
   });
+}
+// Writes a data: URL string across N trainingFileChunks docs (ids
+// "<materialId>_0", "<materialId>_1", …) and returns the chunk count.
+async function thSaveChunkedFile(materialId, dataUrl, onProgress){
+  const chunks = [];
+  for(let i=0;i<dataUrl.length;i+=CHUNK_CHARS) chunks.push(dataUrl.slice(i, i+CHUNK_CHARS));
+  for(let i=0;i<chunks.length;i++){
+    await colFileChunks().doc(materialId+'_'+i).set({ parentId: materialId, index:i, data: chunks[i] });
+    if(onProgress) onProgress(i+1, chunks.length);
+  }
+  return chunks.length;
+}
+// Deletes chunk docs <materialId>_0 .. <materialId>_(count-1). Safe to call
+// with count=0 (does nothing).
+async function thDeleteChunkedFile(materialId, count){
+  const jobs = [];
+  for(let i=0;i<(count||0);i++) jobs.push(colFileChunks().doc(materialId+'_'+i).delete());
+  await Promise.all(jobs);
+}
+// Reassembles a chunked file's full data: URL by reading its chunk docs
+// directly by id (one-off .get() calls, not kept in the live cache — these
+// files can be several MB and are only needed when the user clicks View).
+async function thLoadChunkedFile(materialId, count){
+  const snaps = await Promise.all(
+    Array.from({length:count||0}, (_,i)=>colFileChunks().doc(materialId+'_'+i).get())
+  );
+  return snaps.map(s=>s.exists ? (s.data()||{}).data || '' : '').join('');
 }
 function thPcmFromAudioBuffer(buf){
   const ch0 = buf.getChannelData(0);
@@ -3462,10 +3502,16 @@ function thMaterialUrl(m){
   return m.url;
 }
 function thMaterialItem(m){
+  // A chunked upload has no ready `url` — it has to be reassembled from its
+  // trainingFileChunks docs first, so "View" is a button that fetches+opens
+  // it on click instead of a plain link (see ACTIONS['th-view-chunked']).
+  const viewBtn = m.chunked
+    ? '<button class="btn sm secondary" data-act="th-view-chunked" data-id="'+esc(m.id)+'" data-count="'+(m.chunkCount||0)+'" data-mime="'+esc(m.mimeType||'')+'">View</button>'
+    : '<a class="btn sm secondary" href="'+esc(thMaterialUrl(m))+'" target="_blank" rel="noopener">View</a>';
   return '<div class="th-material">'+
     '<span style="font-size:18px;">'+(m.sourceType==='link'?'🔗':'📄')+'</span>'+
     '<div class="nm">'+esc(m.name||'Untitled')+' <span class="meta">'+(m.sourceType==='link'?'Link':'Uploaded')+(m.addedAt?' · '+new Date(m.addedAt).toLocaleDateString():'')+'</span></div>'+
-    '<a class="btn sm secondary" href="'+esc(thMaterialUrl(m))+'" target="_blank" rel="noopener">View</a>'+
+    viewBtn+
     '<button class="btn sm secondary" data-act="th-replace-material" data-id="'+esc(m.id)+'">Replace</button>'+
     '<button class="btn sm secondary" data-act="th-delete-material" data-id="'+esc(m.id)+'">Delete</button>'+
   '</div>';
@@ -3683,7 +3729,7 @@ function openMaterialModal(topicKey, existing, kind){
     '<div class="stack" style="margin-top:12px;">'+
       '<div class="field"><label>'+label+' Name</label><input type="text" id="th-mat-name" value="'+esc(existing?existing.name:'')+'" placeholder="'+(isTranscript?'e.g. Case A — call transcript':'e.g. Melasma Training PPT')+'"></div>'+
       '<div class="field"><label>Upload a file</label><input type="file" id="th-mat-file" accept="'+(isTranscript?'.pdf,.doc,.docx,.txt,.rtf,.pages':'.ppt,.pptx,.pdf,.doc,.docx,.xls,.xlsx,.key,.png,.jpg,.jpeg')+'">'+
-      '<p class="hint" style="margin:4px 0 0;">'+(isTranscript?'PDF、Word、文字档都可以':'PPT, PDF, Word, Excel, Keynote or an image')+' — please keep it under 650KB. 档案比较大的话，改用下面的连结，不受大小限制。</p></div>'+
+      '<p class="hint" style="margin:4px 0 0;">'+(isTranscript?'PDF、Word、文字档都可以':'PPT, PDF, Word, Excel, Keynote or an image')+' — up to about 8MB (bigger files auto-split and may take a moment to save). 真的很大的话，改用下面的连结不受大小限制。</p></div>'+
       '<div class="field"><label>Or paste a link (Google Drive, etc.)</label><input type="text" id="th-mat-link" placeholder="https://…" value="'+esc(existing&&existing.sourceType==='link'?existing.url:'')+'"></div>'+
       '<div id="th-mat-progress" class="hint"></div>'+
     '</div>'+
@@ -3704,7 +3750,21 @@ ACTIONS['th-delete-material'] = async (el)=>{
   const m = (S.cache.trainingMaterials||[]).find(x=>x.id===el.dataset.id);
   closeModal();
   await colTrainingMaterials().doc(el.dataset.id).delete();
+  if(m && m.chunked) await thDeleteChunkedFile(m.id, m.chunkCount);
   if(m && m.storagePath && S.assets) S.assets.deleteFile(m.storagePath);
+};
+ACTIONS['th-view-chunked'] = async (el)=>{
+  const id = el.dataset.id, count = Number(el.dataset.count)||0;
+  const original = el.textContent;
+  el.disabled = true; el.textContent = '打开中…';
+  try{
+    const dataUrl = await thLoadChunkedFile(id, count);
+    const blob = await (await fetch(dataUrl)).blob();
+    const blobUrl = URL.createObjectURL(blob);
+    window.open(blobUrl, '_blank');
+    setTimeout(()=>URL.revokeObjectURL(blobUrl), 60000);
+  } catch(e){ console.error(e); alert('打开失败，请重试。'); }
+  finally { el.disabled = false; el.textContent = original; }
 };
 ACTIONS['th-save-material'] = async (el)=>{
   const name = (document.getElementById('th-mat-name').value||'').trim();
@@ -3714,26 +3774,44 @@ ACTIONS['th-save-material'] = async (el)=>{
   const topicKey = el.dataset.key;
   const id = el.dataset.id;
   const kind = el.dataset.kind || 'material';
+  const existing = id ? (S.cache.trainingMaterials||[]).find(x=>x.id===id) : null;
   if(!name){ alert('Please name this.'); return; }
   if(!file && !link && !id){ alert('Please upload a file or paste a link.'); return; }
+  if(file && file.size > MAX_CHUNKED_FILE_BYTES){
+    alert('这个档案太大了（'+(file.size/1024/1024).toFixed(1)+' MB），连分段存都塞不下（上限大概 8MB）。\n\n请把档案放到 Google Drive 分享出来，把连结贴在下面「Or paste a link」那格（不受大小限制）。');
+    return;
+  }
   el.disabled = true;
   const progEl = document.getElementById('th-mat-progress');
   try{
+    const docId = id || colTrainingMaterials().doc().id;
     const data = { name, topicKey, kind, addedAt: Date.now() };
+    const oldChunkCount = existing && existing.chunked ? (existing.chunkCount||0) : 0;
     if(file){
-      if(file.size > MATERIAL_MAX_BYTES){
-        alert('这个档案有点大（'+(file.size/1024/1024).toFixed(1)+' MB），直接存的话会失败。\n\n建议：\n1) 把档案放到 Google Drive 分享出来，把连结贴在下面「Or paste a link」那格（不受大小限制）；\n2) 或者把档案压缩小一点，存档大小控制在 650KB 以内再重新上传。');
-        el.disabled = false; return;
-      }
       if(progEl) progEl.textContent = '处理中…';
-      data.url = await readFileAsDataURL(file);
-      data.sourceType = 'upload';
-      data.storagePath = null;
+      const dataUrl = await readFileAsDataURL(file);
+      if(file.size > MATERIAL_MAX_BYTES){
+        const count = await thSaveChunkedFile(docId, dataUrl, (done,total)=>{ if(progEl) progEl.textContent = '上传中… '+done+'/'+total; });
+        data.chunked = true; data.chunkCount = count; data.mimeType = file.type||''; data.url = null;
+        data.sourceType = 'upload'; data.storagePath = null;
+        // If the new file needed fewer chunks than the old one, the leftover
+        // higher-index chunk docs from the old file are now stale — clean up
+        // only those (indices [count, oldChunkCount)), never the ones we just
+        // wrote for this save.
+        if(oldChunkCount > count){
+          const leftover = [];
+          for(let i=count;i<oldChunkCount;i++) leftover.push(colFileChunks().doc(docId+'_'+i).delete());
+          await Promise.all(leftover);
+        }
+      } else {
+        data.url = dataUrl; data.sourceType = 'upload'; data.storagePath = null; data.chunked = false; data.chunkCount = 0;
+        if(oldChunkCount) await thDeleteChunkedFile(docId, oldChunkCount);
+      }
     } else if(link){
-      data.url = link; data.sourceType = 'link'; data.storagePath = null;
+      data.url = link; data.sourceType = 'link'; data.storagePath = null; data.chunked = false; data.chunkCount = 0;
+      if(oldChunkCount) await thDeleteChunkedFile(docId, oldChunkCount);
     }
-    if(id) await colTrainingMaterials().doc(id).set(data, { merge:true });
-    else await colTrainingMaterials().doc().set(data);
+    await colTrainingMaterials().doc(docId).set(data, { merge:true });
     closeModal(); toast('已保存');
   } catch(e){ console.error(e); alert('保存失败，请重试。'); }
   finally { el.disabled = false; }
