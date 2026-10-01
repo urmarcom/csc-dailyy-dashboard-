@@ -2974,7 +2974,12 @@ function thTopic(key){ return TRAINING_TOPICS.find(t=>t.key===key) || null; }
 function thWeekday(dateStr){ return WEEKDAY_FULL[parseISO(dateStr).getDay()]; }
 function thDateLabel(dateStr){ const d=parseISO(dateStr); return MONTH_NAMES[d.getMonth()].slice(0,3)+' '+d.getDate()+', '+d.getFullYear(); }
 function thIsPast(dateStr){ return parseISO(dateStr) < todayDate(); }
-function thMaterials(topicKey){ return (S.cache.trainingMaterials||[]).filter(m=>m.topicKey===topicKey).sort((a,b)=>(a.addedAt||0)-(b.addedAt||0)); }
+function thMaterials(topicKey){ return (S.cache.trainingMaterials||[]).filter(m=>m.topicKey===topicKey && m.kind!=='transcript').sort((a,b)=>(a.addedAt||0)-(b.addedAt||0)); }
+// Transcripts reuse the same trainingMaterials collection/shape (file-or-link
+// item) as Knowledge materials, just tagged kind:'transcript' and filtered
+// out of thMaterials() above — they live in their own subsection under
+// Skills instead, independent of any particular call.
+function thTranscripts(topicKey){ return (S.cache.trainingMaterials||[]).filter(m=>m.topicKey===topicKey && m.kind==='transcript').sort((a,b)=>(a.addedAt||0)-(b.addedAt||0)); }
 function thCalls(topicKey){ return (S.cache.trainingCalls||[]).filter(c=>c.topicKey===topicKey).sort((a,b)=>String(b.callDate||'').localeCompare(String(a.callDate||''))||(b.uploadedAt||0)-(a.uploadedAt||0)); }
 function thAllCalls(){ return (S.cache.trainingCalls||[]).slice(); }
 function thNextTopic(){ return TRAINING_TOPICS.find(t=>!thIsPast(t.date)) || null; }
@@ -3110,6 +3115,12 @@ function thKnowledgeNotesFor(topicKey){
   return thAllNotes().filter(n=>n.scope==='knowledge' && n.topicKey===topicKey)
     .sort((a,b)=>(a.order!=null?a.order:(a.createdAt||0)) - (b.order!=null?b.order:(b.createdAt||0)));
 }
+// General Skills-level learning points for a topic — independent of any one
+// call, sitting below the call list (parallel to Knowledge Notes above).
+function thSkillsTopicNotesFor(topicKey){
+  return thAllNotes().filter(n=>n.scope==='skillsTopic' && n.topicKey===topicKey)
+    .sort((a,b)=>(a.order!=null?a.order:(a.createdAt||0)) - (b.order!=null?b.order:(b.createdAt||0)));
+}
 function thCallNotesFor(callId){
   return thAllNotes().filter(n=>n.scope==='skills' && n.callId===callId)
     .sort((a,b)=>{
@@ -3178,6 +3189,32 @@ function thKnowledgeNotesBlock(topicKey){
       : '<button class="th-addnote-btn" data-act="th-note-add-start" data-group="'+groupKey+'" data-topic="'+esc(topicKey)+'">+ Add Note</button>')+
   '</div>';
 }
+// Compact "Transcripts" subsection, meant to sit inside the Skills card
+// below the call list — independent of any one call (the file/link shape
+// is the same as a Knowledge material, see thTranscripts()/openMaterialModal).
+function thTranscriptsBlock(topicKey){
+  const items = thTranscripts(topicKey);
+  return '<div class="th-notesblock">'+
+    '<div class="th-notesblock-head">📄 Transcripts</div>'+
+    (items.length ? items.map(thMaterialItem).join('') : '<p class="th-notesblock-empty">No transcripts yet</p>')+
+    '<button class="btn sm secondary" data-act="th-add-transcript" data-key="'+esc(topicKey)+'">+ Add Transcript</button>'+
+  '</div>';
+}
+// Compact "Learning Points" subsection, also inside the Skills card below
+// the call list — general takeaways for the topic as a whole, separate from
+// any one call's own "Case Study Notes" (see thCallNotesBlock below).
+function thSkillsTopicNotesBlock(topicKey){
+  const notes = thSkillsTopicNotesFor(topicKey);
+  const groupKey = 'st:'+topicKey;
+  const isAdding = S.cache.thAddingNoteGroup === groupKey;
+  return '<div class="th-notesblock" style="margin-top:14px;">'+
+    '<div class="th-notesblock-head">💡 Learning Points</div>'+
+    (notes.length ? '<ol class="th-noterows">'+notes.map((n,i)=>thKnowledgeNoteRow(n,i,notes.length)).join('')+'</ol>'
+      : (isAdding ? '' : '<p class="th-notesblock-empty">No learning points yet</p>'))+
+    (isAdding ? thNoteAddForm(groupKey, 'What\'s the learning point here?')
+      : '<button class="th-addlp-btn" data-act="th-note-add-start" data-group="'+groupKey+'" data-topic="'+esc(topicKey)+'">💡 Add Learning Point</button>')+
+  '</div>';
+}
 // Same idea but for one specific call's "Case Study Notes" — lives inside
 // thCallCard, so it shows up wherever that call card is rendered (the Skills
 // browse view and the per-topic page both reuse thCallCard).
@@ -3219,6 +3256,10 @@ ACTIONS['th-note-add-save'] = async (el)=>{
       const topicKey = group.slice(3);
       const order = thKnowledgeNotesFor(topicKey).length;
       data = { scope:'knowledge', topicKey, text, order, createdAt: Date.now(), author: thAuthorName() };
+    } else if(group.indexOf('st:')===0){
+      const topicKey = group.slice(3);
+      const order = thSkillsTopicNotesFor(topicKey).length;
+      data = { scope:'skillsTopic', topicKey, text, order, createdAt: Date.now(), author: thAuthorName() };
     } else {
       const callId = group.slice(3);
       const call = (S.cache.trainingCalls||[]).find(c=>c.id===callId);
@@ -3261,8 +3302,8 @@ ACTIONS['th-note-delete'] = async (el)=>{
 };
 async function thKnoteSwap(id, dir){
   const n = thAllNotes().find(x=>x.id===id);
-  if(!n || n.scope!=='knowledge') return;
-  const list = thKnowledgeNotesFor(n.topicKey);
+  if(!n || (n.scope!=='knowledge' && n.scope!=='skillsTopic')) return;
+  const list = n.scope==='knowledge' ? thKnowledgeNotesFor(n.topicKey) : thSkillsTopicNotesFor(n.topicKey);
   const idx = list.findIndex(x=>x.id===id);
   const swapIdx = idx+dir;
   if(idx<0 || swapIdx<0 || swapIdx>=list.length) return;
@@ -3342,6 +3383,8 @@ function thStyles(){
   '.th-note-iconbtn:hover{background:var(--surface);}'+
   '.th-addnote-btn{border:none;background:transparent;color:var(--accent-soft-ink);font-size:12.5px;font-weight:700;cursor:pointer;padding:4px 2px;}'+
   '.th-addnote-btn:hover{text-decoration:underline;}'+
+  '.th-addlp-btn{border:1px solid var(--gold);background:var(--accent-soft);color:var(--accent-soft-ink);font-size:12.5px;font-weight:700;cursor:pointer;padding:6px 14px;border-radius:999px;margin-top:2px;transition:background .12s,transform .12s;}'+
+  '.th-addlp-btn:hover{background:var(--gold);color:var(--ink);transform:translateY(-1px);}'+
   '.th-noteaddform{margin-top:4px;}'+
   '.th-noteaddform-ts{font-size:11.5px;color:var(--ink-faint);margin-top:4px;font-weight:700;}'+
   '.th-note-editarea{width:100%;padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font:inherit;font-size:13px;resize:vertical;}'+
@@ -3521,6 +3564,9 @@ function thTopicView(key){
       '<div class="card-title">🎧 Skills — Case Study Calls · '+esc(t.sTime)+' · '+esc(t.sPic)+'</div>'+
       (calls.length ? calls.map(c=>thCallCard(c,false)).join('') : '<p class="hint" style="margin:2px 0 12px;">还没有上传录音</p>')+
       '<button class="btn sm secondary" data-act="th-add-call" data-key="'+t.key+'">+ Add New Call</button>'+
+      '<hr class="th-notes-divider">'+
+      thTranscriptsBlock(t.key)+
+      thSkillsTopicNotesBlock(t.key)+
     '</div>'
   );
 }
@@ -3601,7 +3647,7 @@ function renderCaseStudyPane(){
 // its audio plays, without a full re-render (that would fight typing/focus).
 function thWireNoteTimestampButtons(root){
   root.querySelectorAll('audio[id^="th-audio-"]').forEach(audio=>{
-    const btn = root.querySelector('.th-addnote-btn[data-audio="'+audio.id+'"]');
+    const btn = root.querySelector('[data-act="th-note-add-start"][data-audio="'+audio.id+'"]');
     if(!btn) return;
     const update = ()=>{ btn.textContent = '+ Note at '+thFmtTimestamp(audio.currentTime); };
     update();
@@ -3624,30 +3670,37 @@ ACTIONS['th-speed'] = (el)=>{
   a.playbackRate = Number(el.dataset.speed)||1;
   el.parentElement.querySelectorAll('.th-speedbtn').forEach(b=>b.classList.toggle('active', b===el));
 };
-function openMaterialModal(topicKey, existing){
+// kind: 'material' (Knowledge) or 'transcript' (Skills) — same storage shape
+// (file-or-link item in trainingMaterials), just tagged differently and
+// shown in a different subsection.
+function openMaterialModal(topicKey, existing, kind){
+  kind = kind || (existing ? (existing.kind||'material') : 'material');
   const t = thTopic(topicKey);
+  const isTranscript = kind==='transcript';
+  const label = isTranscript ? 'Transcript' : 'Material';
   openModal(
-    '<h3>'+(existing?'Update Material':'+ Add Material')+' — '+esc(t?t.name:'')+'</h3>'+
+    '<h3>'+(existing?('Update '+label):('+ Add '+label))+' — '+esc(t?t.name:'')+'</h3>'+
     '<div class="stack" style="margin-top:12px;">'+
-      '<div class="field"><label>Material Name</label><input type="text" id="th-mat-name" value="'+esc(existing?existing.name:'')+'" placeholder="e.g. Melasma Training PPT"></div>'+
-      '<div class="field"><label>Upload a file</label><input type="file" id="th-mat-file" accept=".ppt,.pptx,.pdf,.doc,.docx,.xls,.xlsx,.key,.png,.jpg,.jpeg">'+
-      '<p class="hint" style="margin:4px 0 0;">PPT, PDF, Word, Excel, Keynote or an image — please keep it under 650KB. 档案比较大的话，改用下面的连结，不受大小限制。</p></div>'+
+      '<div class="field"><label>'+label+' Name</label><input type="text" id="th-mat-name" value="'+esc(existing?existing.name:'')+'" placeholder="'+(isTranscript?'e.g. Case A — call transcript':'e.g. Melasma Training PPT')+'"></div>'+
+      '<div class="field"><label>Upload a file</label><input type="file" id="th-mat-file" accept="'+(isTranscript?'.pdf,.doc,.docx,.txt,.rtf,.pages':'.ppt,.pptx,.pdf,.doc,.docx,.xls,.xlsx,.key,.png,.jpg,.jpeg')+'">'+
+      '<p class="hint" style="margin:4px 0 0;">'+(isTranscript?'PDF、Word、文字档都可以':'PPT, PDF, Word, Excel, Keynote or an image')+' — please keep it under 650KB. 档案比较大的话，改用下面的连结，不受大小限制。</p></div>'+
       '<div class="field"><label>Or paste a link (Google Drive, etc.)</label><input type="text" id="th-mat-link" placeholder="https://…" value="'+esc(existing&&existing.sourceType==='link'?existing.url:'')+'"></div>'+
       '<div id="th-mat-progress" class="hint"></div>'+
     '</div>'+
     '<div class="spread" style="margin-top:18px;">'+
       (existing?'<button class="btn danger sm" data-act="th-delete-material" data-id="'+esc(existing.id)+'">Delete</button>':'<span></span>')+
-      '<div class="row" style="gap:8px;"><button class="btn secondary" data-act="modal-close">Cancel</button><button class="btn" data-act="th-save-material" data-id="'+(existing?esc(existing.id):'')+'" data-key="'+esc(topicKey)+'">Save</button></div>'+
+      '<div class="row" style="gap:8px;"><button class="btn secondary" data-act="modal-close">Cancel</button><button class="btn" data-act="th-save-material" data-id="'+(existing?esc(existing.id):'')+'" data-key="'+esc(topicKey)+'" data-kind="'+kind+'">Save</button></div>'+
     '</div>'
   );
 }
-ACTIONS['th-add-material'] = (el)=>{ openMaterialModal(el.dataset.key, null); };
+ACTIONS['th-add-material'] = (el)=>{ openMaterialModal(el.dataset.key, null, 'material'); };
+ACTIONS['th-add-transcript'] = (el)=>{ openMaterialModal(el.dataset.key, null, 'transcript'); };
 ACTIONS['th-replace-material'] = (el)=>{
   const m = (S.cache.trainingMaterials||[]).find(x=>x.id===el.dataset.id);
-  if(m) openMaterialModal(m.topicKey, m);
+  if(m) openMaterialModal(m.topicKey, m, m.kind||'material');
 };
 ACTIONS['th-delete-material'] = async (el)=>{
-  if(!confirm('Delete this material? This can\'t be undone.')) return;
+  if(!confirm('Delete this item? This can\'t be undone.')) return;
   const m = (S.cache.trainingMaterials||[]).find(x=>x.id===el.dataset.id);
   closeModal();
   await colTrainingMaterials().doc(el.dataset.id).delete();
@@ -3660,15 +3713,16 @@ ACTIONS['th-save-material'] = async (el)=>{
   const file = fileInput && fileInput.files[0];
   const topicKey = el.dataset.key;
   const id = el.dataset.id;
-  if(!name){ alert('Please name this material.'); return; }
+  const kind = el.dataset.kind || 'material';
+  if(!name){ alert('Please name this.'); return; }
   if(!file && !link && !id){ alert('Please upload a file or paste a link.'); return; }
   el.disabled = true;
   const progEl = document.getElementById('th-mat-progress');
   try{
-    const data = { name, topicKey, addedAt: Date.now() };
+    const data = { name, topicKey, kind, addedAt: Date.now() };
     if(file){
       if(file.size > MATERIAL_MAX_BYTES){
-        alert('这个档案有点大（'+(file.size/1024/1024).toFixed(1)+' MB），直接存的话会失败。\n\n建议：\n1) 把档案放到 Google Drive 分享出来，把连结贴在下面「Or paste a link」那格（不受大小限制）；\n2) 或者在 PowerPoint/Word 里把图片压缩小一点、重新导出，存档大小控制在 650KB 以内再重新上传。');
+        alert('这个档案有点大（'+(file.size/1024/1024).toFixed(1)+' MB），直接存的话会失败。\n\n建议：\n1) 把档案放到 Google Drive 分享出来，把连结贴在下面「Or paste a link」那格（不受大小限制）；\n2) 或者把档案压缩小一点，存档大小控制在 650KB 以内再重新上传。');
         el.disabled = false; return;
       }
       if(progEl) progEl.textContent = '处理中…';
