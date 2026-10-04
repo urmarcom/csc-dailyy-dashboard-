@@ -760,6 +760,7 @@ html[data-theme="dark"] #app-followup{
 <div class="hub-switcher" id="hub-switcher">
   <button type="button" class="hub-switch-btn active" data-hub-switch="dashboard">📊 Performance Dashboard</button>
   <button type="button" class="hub-switch-btn" data-hub-switch="followup">💬 Follow Up Hub</button>
+  <button type="button" class="hub-switch-btn" data-hub-switch="callmap">🧭 会问会答 Map</button>
   <button type="button" class="hub-switch-btn" data-hub-switch="whiteboard">🗒️ Whiteboard</button>
   <button type="button" class="hub-switch-btn" data-hub-switch="meeting">📋 Meeting Minutes</button>
   <button type="button" class="hub-switch-btn" data-hub-switch="casestudy">🎓 Training Hub</button>
@@ -769,6 +770,9 @@ html[data-theme="dark"] #app-followup{
 </div>
 <div class="hub-pane" id="hub-pane-followup">
 <div id="app-followup"></div>
+</div>
+<div class="hub-pane" id="hub-pane-callmap">
+<div id="app-callmap"></div>
 </div>
 <div class="hub-pane" id="hub-pane-whiteboard">
 <div id="app-whiteboard"><div class="empty-state">Loading…</div></div>
@@ -5326,6 +5330,577 @@ boot();
   /* ============================= INIT ============================= */
   render();
 })();
+</script>
+<!-- ============ CSC Calling Thinking Map (会问会答 Map) ============
+     Self-contained: renders inside a shadow root in #app-callmap so its styles never touch the rest of the Hub.
+     Default content lives in #callmap-data; edits saved from the page go to Firestore doc callMap/main
+     (same Firebase project as the Dashboard). Editing needs the Dashboard admin password. -->
+<script type="application/json" id="callmap-data">{
+ "version": 2,
+ "tree": {
+  "id": "concern",
+  "children": [
+   {
+    "id": "status",
+    "children": [
+     {
+      "id": "good",
+      "children": [
+       {
+        "path": "A"
+       },
+       {
+        "path": "B"
+       }
+      ]
+     },
+     {
+      "id": "bad",
+      "children": [
+       {
+        "path": "C"
+       },
+       {
+        "path": "D"
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "paths": {
+  "A": {
+   "node": "A_done",
+   "name": "好 + 做过",
+   "color": "A",
+   "chain": [
+    "rebound",
+    "tree",
+    "eco",
+    "ai_soil",
+    "closing"
+   ]
+  },
+  "B": {
+   "node": "B_none",
+   "name": "好 + 没做过",
+   "color": "B",
+   "chain": [
+    "eco_b",
+    "bt_b",
+    "ai_deep",
+    "closing"
+   ]
+  },
+  "C": {
+   "node": "C_done",
+   "name": "不好 + 做过",
+   "color": "C",
+   "chain": [
+    "rebound",
+    "tree",
+    "eco",
+    "ai_soil",
+    "closing"
+   ]
+  },
+  "D": {
+   "node": "D_none",
+   "name": "不好 + 没做过",
+   "color": "D",
+   "chain": [
+    "need",
+    "ai_safe",
+    "bt_d",
+    "custom",
+    "closing"
+   ]
+  }
+ },
+ "nodes": {
+  "concern": {
+   "kind": "customer",
+   "label": "有斑 Concern",
+   "hint": "客户有斑的困扰",
+   "ask": [],
+   "answer": "> 从这里开始。先不要急着介绍 treatment，先问 Status，了解她的斑现在怎样。"
+  },
+  "status": {
+   "kind": "question",
+   "label": "Status",
+   "hint": "斑最近怎样？",
+   "ask": [
+    "想问看你最近斑的状况是怎样？有比较好吗？"
+   ],
+   "answer": ""
+  },
+  "good": {
+   "kind": "customer",
+   "label": "好",
+   "ask": [
+    "哦～那你之前是有去做什么 treatment 还是什么吗？"
+   ],
+   "answer": ""
+  },
+  "bad": {
+   "kind": "customer",
+   "label": "不好",
+   "ask": [
+    "那你有曾经或者正在接受什么 treatment 吗？"
+   ],
+   "answer": "> Dr Jaye 的问法：「那你有曾经或者正在接受什么治疗吗？」"
+  },
+  "A_done": {
+   "kind": "customer",
+   "label": "做过",
+   "hint": "停了会担心反黑吗？",
+   "ask": [
+    "哦，你做过啊。这样其实想了解看，你会担心你的斑 treatment 停了过后，会反黑还是反弹吗？"
+   ],
+   "answer": "",
+   "nextWhen": "客户说会担心"
+  },
+  "B_none": {
+   "kind": "customer",
+   "label": "没做过",
+   "hint": "为什么觉得斑好了？",
+   "ask": [
+    "哦，明白。这样其实为什么你会觉得你的斑好了呢？"
+   ],
+   "answer": "> 先不要马上教育客户。先听她说为什么觉得斑好了，再带进「皮肤生态圈」。",
+   "nextWhen": "听完她的原因后"
+  },
+  "C_done": {
+   "kind": "customer",
+   "label": "做过",
+   "hint": "效果达到预期吗？",
+   "ask": [
+    "那可以了解你治疗的进展如何，效果有达到你的预期吗？"
+   ],
+   "answer": "",
+   "responses": [
+    {
+     "when": "没达到预期",
+     "ask": [
+      "哦，那如果现在有一个机会，让你治好你的斑，你会想了解吗？",
+      "哦，明白。是不是你停了 treatment 过后，你的斑又反弹或者反黑回来了？"
+     ],
+     "answer": "> 客户说「是，停了又反黑」→ 进入「反黑 / 反弹」",
+     "go": "rebound"
+    },
+    {
+     "when": "达到预期",
+     "ask": [
+      "哦，那太好了，我可以知道你现在在接受怎样的疗程吗？我反而要向你学习了。"
+     ],
+     "answer": "> 真心去了解她在做什么。如果她提到停了会反黑，一样可以带进「反黑 / 反弹」。"
+    }
+   ],
+   "nextWhen": "客户说停了又反黑"
+  },
+  "D_none": {
+   "kind": "customer",
+   "label": "没做过",
+   "hint": "是什么阻碍你行动？",
+   "ask": [
+    "那你想要看到你的斑变好吗？",
+    "哦，明白。其实你的斑也有一段时间了，对吗？",
+    "那我想了解一下，是什么原因一直阻碍到你没有真正去行动呢？",
+    "是因为你担心效果、安全性，还是其实一直没有时间？"
+   ],
+   "answer": "",
+   "nextWhen": "听她说出真正的原因"
+  },
+  "rebound": {
+   "kind": "knowledge",
+   "icon": "🔄",
+   "label": "反黑 / 反弹",
+   "hint": "不一定是 Laser 的问题",
+   "ask": [],
+   "answer": "~ 🔄 又反黑了 | 客户的经历 → ❓ 是 Laser 的问题？ | 客户的怀疑 → 🌱 不一定 | 用树来解释\n「其实很多人在祛斑的时候都会遇到反黑。」\n「但是反黑不一定代表是祛斑 Laser 的问题。」\n> 重点：让客户明白问题不一定在 Laser。接着用「树的比喻」。"
+  },
+  "tree": {
+   "kind": "knowledge",
+   "icon": "🌳",
+   "label": "树的比喻",
+   "hint": "枯叶 · 剪刀 · 泥土",
+   "ask": [],
+   "answer": "~ 🌳 一棵树 | 一直长出枯叶 → ✂️ 用剪刀剪 | 剪了又再长 → 🌱 问题在泥土 | 不一定是剪刀\n「今天你种了一棵树，这棵树一直长出枯叶。」\n「你拿一把剪刀，把枯叶剪掉。可是剪了之后，它还是继续长枯叶。你再剪，它又再长。」\n「这个时候你可能会开始觉得：是不是剪刀的问题？」\n「但其实不一定是剪刀的问题。有可能真正出现问题的是泥土，所以这棵树长出来的叶子才一直是枯的。」\n「祛斑也是一样。我们一直做祛斑，做了之后没有好，或者又反黑，我们很容易觉得：是不是 Laser 的问题？但其实不一定只是 Laser 的问题。」\n\n✂️ 剪刀 = Laser\n🍂 枯叶 = 斑 / 黑色素\n🌱 泥土 = 整个皮肤生态圈"
+  },
+  "eco": {
+   "kind": "knowledge",
+   "icon": "🌿",
+   "label": "生态圈",
+   "hint": "不只看表面黑色素",
+   "ask": [],
+   "answer": "~ 👁️ 表面黑色素 | 眼睛看到的 → 🌿 整个皮肤 | 表面 + 深层\n「祛斑不能只是看表面的黑色素。我们需要看的是整个皮肤，而且不是只看皮肤表面，还需要了解皮肤深层。」\n深层可能有\n- 🔥 慢性发炎\n- ⏳ 老化\n- 🩸 异常 / 不健康的微细血管\n- 🛡️ 屏障受损\n- ➕ 其他深层皮肤问题\n\n「这些因素都有可能影响斑不断形成、回来或者反黑。」"
+  },
+  "ai_soil": {
+   "kind": "knowledge",
+   "icon": "🔬",
+   "label": "AI Skin Analysis",
+   "hint": "找出泥土的问题",
+   "ask": [],
+   "answer": "~ 🔬 AI Skin Analysis | 找出泥土的问题 → 🍂 处理枯叶 | 处理斑 → 🌱 照顾泥土 | 皮肤越来越健康\n「所以你可以先过来，我们先帮你做一个 AI Skin Analysis。」\n「我们先找一下你的‘泥土’里面，到底是什么东西导致你一直长出‘枯叶’。」\n「我除了帮你把枯叶处理掉，我也希望可以帮你把整个泥土照顾好，让你的皮肤环境越来越健康。」\n「所以我们不只是看你的斑，也希望让你整个皮肤生态圈越来越健康、越来越年轻。」"
+  },
+  "eco_b": {
+   "kind": "knowledge",
+   "icon": "🌿",
+   "label": "皮肤生态圈",
+   "hint": "看不到 ≠ 没问题",
+   "ask": [],
+   "answer": "~ 👁️ 看到的斑 | 只是表面一部分 → 🌿 皮肤生态圈 | 深层看不到\n「其实我想跟你分享一下，我们现在看到的斑，只是皮肤表面看到的一部分。」\n「我们的皮肤其实是一个完整的生态圈。」\n「如果你没有真正做过皮肤检测，其实你也不会知道你的皮肤深层现在面对着什么问题。」\n眼睛看不到的\n- 🔥 慢性发炎\n- 🩸 异常血管\n- 🛡️ 屏障受损\n- ⏳ 老化\n\n「这些都可能跟斑的问题有关。」"
+  },
+  "bt_b": {
+   "kind": "knowledge",
+   "icon": "🩸",
+   "label": "Blood Test",
+   "hint": "没检查，就不知道",
+   "ask": [],
+   "answer": "~ 🩸 Blood Test | 看身体里面 → 🔬 AI Skin Analysis | 看皮肤深层\n🩸 身体 = Blood Test\n🔬 皮肤 = AI Skin Analysis\n「就好像我们的身体一样，如果今天你没有去做 Blood Test，其实你也不知道你的身体里面发生了什么，对吗？」\n「皮肤也是一样。我们不能只是看表面觉得斑好像淡了，就代表深层的皮肤状态一定没有问题。」"
+  },
+  "ai_deep": {
+   "kind": "knowledge",
+   "icon": "🔬",
+   "label": "AI Skin Analysis",
+   "hint": "先看皮肤深层",
+   "ask": [],
+   "answer": "~ 🔬 AI Skin Analysis | 看皮肤深层 → 🔎 了解斑的情况 | 再决定怎么做\n「所以我们会先帮你做一个 AI Skin Analysis，看一下你皮肤深层真正的状况是什么，再去了解你的斑到底是什么情况。」"
+  },
+  "need": {
+   "kind": "need",
+   "icon": "🎯",
+   "label": "需求点",
+   "hint": "找出她真正的顾虑",
+   "ask": [],
+   "answer": "> 不要不管客户说什么都给同一个答案。先听她真正担心什么，再按她的顾虑回答。",
+   "responses": [
+    {
+     "when": "✨ 效果",
+     "ask": [
+      "可以了解你担心的效果是哪一方面吗？是怕做了没效果，还是怕会反黑？"
+     ],
+     "answer": "「明白。所以我们不会一开始就直接帮你做 treatment，会先帮你做 AI Skin Analysis，找到你的斑背后真正的原因，医生再根据你的状况去安排。」\n> 草稿，可以按实际说法修改。",
+     "go": "ai_safe"
+    },
+    {
+     "when": "🛡️ 安全性",
+     "ask": [
+      "你比较担心的是哪一方面？是怕痛、怕伤到皮肤，还是怕副作用？"
+     ],
+     "answer": "「明白你的担心。我们这边是医生亲自看的，不是美容院。而且第一步只是做 AI Skin Analysis，先了解你皮肤深层的状况，医生才决定适合你的方式。」\n> 草稿，可以按实际说法修改。",
+     "go": "ai_safe"
+    },
+    {
+     "when": "⏰ 时间",
+     "ask": [
+      "明白。你平时比较方便是平日还是周末？"
+     ],
+     "answer": "「其实第一步只是过来做 AI Skin Analysis，我们可以配合你方便的时间。」\n> 草稿，可以按实际说法修改。",
+     "go": "ai_safe"
+    },
+    {
+     "when": "💭 其他",
+     "ask": [
+      "可以跟我分享多一点吗？是什么让你一直还没决定？"
+     ],
+     "answer": "> 先把真正的原因问清楚，再回答。听到新的原因，可以在这里加一个新的客户回应。",
+     "go": "ai_safe"
+    }
+   ]
+  },
+  "ai_safe": {
+   "kind": "knowledge",
+   "icon": "🔬",
+   "label": "AI Skin Analysis",
+   "hint": "先检查，不是直接做",
+   "ask": [],
+   "answer": "~ 🔬 先检查 | AI Skin Analysis → 💉 不是直接做 | treatment 之后才谈\n「其实这个你可以放心，我们不是一开始就直接帮你做 treatment，我们会先帮你做一个 AI Skin Analysis。」"
+  },
+  "bt_d": {
+   "kind": "knowledge",
+   "icon": "🩸",
+   "label": "Blood Test",
+   "hint": "先了解皮肤深层",
+   "ask": [],
+   "answer": "~ 🩸 Blood Test | 看身体里面 → 🔬 AI Skin Analysis | 看皮肤深层\n🩸 身体 = Blood Test\n🔬 皮肤 = AI Skin Analysis\n「其实就好像我们身体做 Blood Test 一样，如果没有检查，我们也不知道身体里面真正发生什么。」\n「皮肤也是一样，我们会先了解你皮肤深层真正的状况。」"
+  },
+  "custom": {
+   "kind": "knowledge",
+   "icon": "🧬",
+   "label": "量身定制 Treatment",
+   "hint": "医生按她的状况安排",
+   "ask": [],
+   "answer": "~ 🔬 了解真正状况 | AI Skin Analysis → 🩺 医生评估 | 看她的皮肤 → 🧬 量身定制 | 适合她的 treatment\n「等我们了解你真正的皮肤状况之后，医生会根据你的状况，量身定制适合你的 treatment。」\n「不是每一个人都做一模一样的 treatment。」\n「我们的方向是改善你整体的皮肤问题，不是只针对表面看到的斑。」"
+  },
+  "closing": {
+   "kind": "closing",
+   "icon": "🤝",
+   "label": "Closing",
+   "hint": "邀请她过来",
+   "ask": [
+    "你想要吗？"
+   ],
+   "answer": "> Closing 的完整说法之后可以在这里更新。"
+  },
+  "sanjianke": {
+   "kind": "knowledge",
+   "icon": "⚔️",
+   "label": "三剑客",
+   "hint": "内容待补充",
+   "ask": [],
+   "answer": "> 这张卡还没有内容。按「编辑内容」把三剑客的会问 / 会答加进来，再用「+ 加一步」放进需要的路线。"
+  }
+ }
+}</script>
+<script>var CALLMAP_CSS="/* Layout: left-to-right thinking map on a dotted board \u2014 tree on the left, four route lanes fanning right; scripts live only in the side panel */\n:host{\n  --bg:#ECEFF2; --canvas:#FFFFFF; --surface:#FFFFFF; --surface-2:#F4F6F8; --ink:#16202B; --muted:#5D6975; --faint:#8E99A4;\n  --line:#DCE2E7; --dot:#DCE1E6; --wire:#C2CBD3;\n  --ask:#4152C8; --ask-bg:#EDEFFC;\n  --rA:#2A8574; --rB:#3A6DB4; --rC:#8852A4; --rD:#BB7133;\n  --on-route:#FFFFFF;\n  --shadow-s:0 1px 2px rgba(22,32,43,.06),0 3px 10px rgba(22,32,43,.05);\n  --shadow-m:0 2px 6px rgba(22,32,43,.07),0 16px 34px rgba(22,32,43,.12);\n  --font:Arial,sans-serif;\n  --ease:cubic-bezier(.2,.8,.2,1);\n}\n@media (prefers-color-scheme:dark){:host(:not([data-theme=\"light\"])){\n  --bg:#0D1217; --canvas:#141B22; --surface:#1A222A; --surface-2:#1F2831; --ink:#E6EBF0; --muted:#A0ACB7; --faint:#75818C;\n  --line:#2A343E; --dot:#222C35; --wire:#3A4652; --ask:#A0AAFF; --ask-bg:#1F2648;\n  --rA:#5CC4AE; --rB:#7FA7E6; --rC:#C38DDC; --rD:#E5A66B; --on-route:#0D1217;\n  --shadow-s:0 1px 2px rgba(0,0,0,.4),0 3px 10px rgba(0,0,0,.25); --shadow-m:0 2px 6px rgba(0,0,0,.4),0 16px 34px rgba(0,0,0,.45); color-scheme:dark}}\n:host([data-theme=\"dark\"]){\n  --bg:#0D1217; --canvas:#141B22; --surface:#1A222A; --surface-2:#1F2831; --ink:#E6EBF0; --muted:#A0ACB7; --faint:#75818C;\n  --line:#2A343E; --dot:#222C35; --wire:#3A4652; --ask:#A0AAFF; --ask-bg:#1F2648;\n  --rA:#5CC4AE; --rB:#7FA7E6; --rC:#C38DDC; --rD:#E5A66B; --on-route:#0D1217;\n  --shadow-s:0 1px 2px rgba(0,0,0,.4),0 3px 10px rgba(0,0,0,.25); --shadow-m:0 2px 6px rgba(0,0,0,.4),0 16px 34px rgba(0,0,0,.45); color-scheme:dark}\n\n*{box-sizing:border-box}\n:host,button,input,select,textarea{font-family:var(--font)}\n:host{display:block;background:transparent;color:var(--ink);font-size:15px;line-height:1.6;margin:0;min-height:calc(100vh - 52px)}\nbutton,input,select,textarea{font-size:inherit;color:inherit}\nbutton{cursor:pointer}\n:focus-visible{outline:2px solid var(--ask);outline-offset:3px}\n.cm-app{transition:padding-right .4s var(--ease)}\n\n/* ---------- header ---------- */\n.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px 32px;padding:26px 24px 18px;max-width:1720px;margin:0 auto}\n.eyebrow{font-size:11px;letter-spacing:.18em;color:var(--muted);font-weight:700;text-transform:uppercase}\n.top h1{font-size:clamp(24px,2.4vw,30px);line-height:1.15;margin:6px 0 8px;letter-spacing:-.01em;text-wrap:balance}\n.top h1 em{font-style:normal;color:var(--faint);font-weight:400;margin-left:8px}\n.sub{margin:0;color:var(--muted);font-size:13.5px;display:flex;flex-wrap:wrap;align-items:center;gap:6px}\n.sub .st{display:inline-flex;align-items:center;gap:6px;background:var(--canvas);border:1px solid var(--line);border-radius:999px;padding:3px 11px}\n.sub .st b{color:var(--ink)}\n.sub .arrow{color:var(--faint)}\n.right{display:flex;flex-direction:column;align-items:flex-end;gap:12px;min-width:0}\n.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:12px;color:var(--muted);justify-content:flex-end}\n.legend span{display:inline-flex;align-items:center;gap:7px}\n.lg{display:inline-block;width:20px;height:13px;border-radius:5px}\n.lg-c{border:1.5px solid var(--ink);background:var(--surface);border-radius:999px}\n.lg-q{background:var(--ask-bg);border:1.5px solid var(--ask);border-radius:7px 7px 7px 2px}\n.lg-k{background:var(--surface);box-shadow:var(--shadow-s);border:1px solid var(--line)}\n.lg-n{background:var(--rD)}\n.lg-x{background:var(--ink);border-radius:999px}\n.actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;align-items:center}\n.btn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 15px;font-size:13px;font-weight:700;color:var(--ink);transition:border-color .2s,background .2s,transform .2s}\n.btn:hover{border-color:var(--faint);transform:translateY(-1px)}\n.btn.on{background:var(--ink);color:var(--canvas);border-color:var(--ink)}\n.btn.primary{background:var(--ask);border-color:var(--ask);color:var(--on-route)}\n.dirty-note{font-size:12.5px;color:var(--rD);font-weight:700}\n.banner{max-width:1720px;margin:0 auto;padding:0 32px}\n.banner div{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--rD);border-radius:14px;padding:10px 14px;font-size:14px;margin-bottom:12px}\n\n/* ---------- board ---------- */\n.stage{max-width:1720px;margin:0 auto;padding:0 24px 28px}\n.board-scroll{overflow-x:auto;border-radius:30px;-webkit-overflow-scrolling:touch}\n.board{position:relative;min-width:1300px;background-color:var(--canvas);background-image:radial-gradient(var(--dot) 1.1px,transparent 1.3px);background-size:22px 22px;border-radius:30px;box-shadow:var(--shadow-s);padding:44px 22px 24px}\n.wires{position:absolute;left:0;top:0;pointer-events:none;overflow:visible;z-index:0}\n.wires path{fill:none;stroke:var(--wire);stroke-width:1.8;stroke-linecap:round;transition:stroke .3s,stroke-width .3s,opacity .3s}\n.wires path.rt{stroke:var(--rc);opacity:.6}\n.wires path.hot{stroke:var(--rc,var(--ink));stroke-width:2.8;opacity:1}\n.board.focus .wires path:not(.hot){opacity:.25}\n.wires.intro path{stroke-dasharray:1;stroke-dashoffset:1;animation:draw .9s var(--ease) forwards;animation-delay:var(--d,0s)}\n@keyframes draw{to{stroke-dashoffset:0}}\n.grid{position:relative;z-index:1;display:grid;grid-template-columns:116px 104px 76px minmax(0,1fr);column-gap:30px;row-gap:22px;align-items:center}\n.cell{display:flex;align-items:center;min-width:0}\n\n/* shared node behaviour */\n.nd{position:relative;border:0;background:none;padding:0;text-align:left;color:var(--ink);transition:transform .25s var(--ease),box-shadow .25s var(--ease),opacity .35s,border-color .25s,background .25s}\n.nd:hover{transform:translateY(-2px)}\n.board.focus .nd:not(.on-trail):not(.active):not(.ahead):not(.twin){opacity:.4}\n.board.focus .nd:hover{opacity:1}\n.reveal{animation:rise .6s var(--ease) both;animation-delay:var(--d,0s)}\n@keyframes rise{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}\n\n/* root */\n.n-root{width:100%;background:var(--ink);color:var(--canvas);border-radius:26px;padding:20px 12px 18px;box-shadow:0 0 0 7px color-mix(in srgb,var(--ink) 7%,transparent),var(--shadow-m);text-align:center}\n.n-root .eb{display:block;font-size:10px;letter-spacing:.2em;opacity:.6;font-weight:700}\n.n-root .lb{display:block;font-size:19px;font-weight:700;line-height:1.2;margin-top:6px}\n.n-root .hn{display:block;font-size:12px;opacity:.7;margin-top:6px}\n.n-root.active{box-shadow:0 0 0 4px var(--canvas),0 0 0 7px var(--ink),var(--shadow-m)}\n\n/* CSC question (speech bubble) */\n.n-q{width:100%;background:var(--ask-bg);border:1.5px solid color-mix(in srgb,var(--ask) 55%,transparent);border-radius:20px 20px 20px 6px;padding:12px 14px 13px;box-shadow:var(--shadow-s)}\n.n-q .eb{display:flex;align-items:center;gap:6px;font-size:10.5px;letter-spacing:.12em;color:var(--ask);font-weight:700}\n.n-q .lb{display:block;font-size:17px;font-weight:700;margin-top:3px}\n.n-q .hn{display:block;font-size:12px;color:var(--muted);line-height:1.45;margin-top:2px}\n.n-q:hover{box-shadow:var(--shadow-m)}\n.n-q.on-trail{border-color:var(--ask)}\n.n-q.active{border-color:var(--ask);box-shadow:0 0 0 3px var(--canvas),0 0 0 5.5px var(--ask),var(--shadow-m)}\n\n/* customer answer (outlined pill) */\n.n-c{width:100%;background:var(--surface);border:1.5px solid color-mix(in srgb,var(--ink) 22%,transparent);border-radius:999px;padding:10px 10px 11px;text-align:center;box-shadow:var(--shadow-s)}\n.n-c .eb{display:block;font-size:10.5px;letter-spacing:.12em;color:var(--muted);font-weight:700}\n.n-c .lb{display:block;font-size:20px;font-weight:700;line-height:1.2}\n.n-c:hover{box-shadow:var(--shadow-m)}\n.n-c.on-trail,.n-c.active{border-color:var(--ink)}\n.n-c.active{box-shadow:0 0 0 3px var(--canvas),0 0 0 5.5px var(--ink),var(--shadow-m)}\n\n/* lanes */\n.lane{position:relative;min-width:max-content;display:flex;align-items:center;min-height:100px;padding:22px 14px 16px 12px;border-radius:24px;background:color-mix(in srgb,var(--route) 6%,var(--canvas));border:1px solid color-mix(in srgb,var(--route) 18%,transparent);transition:background .35s,border-color .35s,box-shadow .35s}\n.lane:hover{border-color:color-mix(in srgb,var(--route) 38%,transparent)}\n.board.focus .lane:not(.lane-on){background:color-mix(in srgb,var(--route) 2%,var(--canvas))}\n.lane.lane-on{border-color:color-mix(in srgb,var(--route) 50%,transparent);box-shadow:0 0 0 5px color-mix(in srgb,var(--route) 8%,transparent)}\n.lane-id{position:absolute;top:-11px;left:18px;display:inline-flex;align-items:center;gap:8px;background:var(--route);color:var(--on-route);border-radius:999px;padding:3px 12px 3px 4px;font-size:12px;font-weight:700;letter-spacing:.02em;box-shadow:var(--shadow-s)}\n.lane-id b{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:color-mix(in srgb,var(--on-route) 25%,transparent);font-size:11px}\n\n/* leaf = customer's answer that opens the route */\n.n-leaf{flex:none;width:140px;background:var(--surface);border:1.5px solid var(--route);border-radius:20px;padding:10px 14px 11px;box-shadow:var(--shadow-s)}\n.n-leaf .eb{display:block;font-size:10.5px;letter-spacing:.12em;color:var(--muted);font-weight:700}\n.n-leaf .lb{display:block;font-size:19px;font-weight:700;color:var(--route);line-height:1.25}\n.n-leaf .hn{display:block;font-size:12px;color:var(--muted);line-height:1.4;margin-top:4px;text-wrap:balance}\n.n-leaf:hover{box-shadow:var(--shadow-m)}\n.n-leaf.active{box-shadow:0 0 0 3px var(--canvas),0 0 0 5.5px var(--route),var(--shadow-m)}\n\n/* connectors inside a lane */\n.link{flex:1 1 14px;min-width:12px;max-width:44px;height:2px;margin:0 3px;background:color-mix(in srgb,var(--route) 40%,transparent);position:relative;border-radius:2px;transition:background .3s}\n.link::after{content:\"\";position:absolute;right:-1px;top:-4px;border:5px solid transparent;border-left:6px solid color-mix(in srgb,var(--route) 55%,transparent);border-right:0}\n.link.hot{background:var(--route)}\n.link.hot::after{border-left-color:var(--route)}\n\n/* knowledge chips */\n.chip{flex:none;display:flex;align-items:center;gap:7px;max-width:148px;background:var(--surface);border:1px solid var(--line);border-radius:17px;padding:7px 11px 7px 7px;box-shadow:var(--shadow-s)}\n.chip .ic{flex:none;width:30px;height:30px;border-radius:11px;display:grid;place-items:center;font-size:17px;background:color-mix(in srgb,var(--route) 12%,var(--surface));transition:transform .3s var(--ease)}\n.chip .lb{font-size:13.5px;font-weight:700;line-height:1.25;word-break:keep-all;overflow-wrap:normal}\n.chip:hover{border-color:color-mix(in srgb,var(--route) 60%,transparent);box-shadow:var(--shadow-m)}\n.chip:hover .ic{transform:scale(1.08) rotate(-4deg)}\n.chip.on-trail{border-color:var(--route)}\n.chip.active{border-color:var(--route);box-shadow:0 0 0 3px var(--canvas),0 0 0 5.5px var(--route),var(--shadow-m)}\n.chip.twin{border-color:var(--route);border-style:dashed}\n.chip.k-need{background:var(--route);border-color:var(--route);color:var(--on-route);padding:11px 16px 11px 10px;max-width:196px;box-shadow:0 0 0 6px color-mix(in srgb,var(--route) 14%,transparent),var(--shadow-m)}\n.chip.k-need .ic{width:40px;height:40px;font-size:21px;background:color-mix(in srgb,var(--on-route) 22%,transparent)}\n.chip.k-need .lb{font-size:18px}\n.chip.k-need .sm{display:block;font-size:11px;font-weight:400;opacity:.85;white-space:nowrap}\n.chip.k-need.active{box-shadow:0 0 0 3px var(--canvas),0 0 0 6px var(--route),var(--shadow-m)}\n.chip.k-closing{background:var(--ink);border-color:var(--ink);color:var(--canvas);border-radius:999px;padding-right:18px}\n.chip.k-closing .ic{background:color-mix(in srgb,var(--canvas) 16%,transparent);border-radius:50%}\n.chip.k-closing.active{box-shadow:0 0 0 3px var(--canvas),0 0 0 5.5px var(--ink),var(--shadow-m)}\n.chip.k-question{background:var(--ask-bg);border-color:color-mix(in srgb,var(--ask) 50%,transparent);border-radius:18px 18px 18px 6px}\n.shared{position:absolute;top:-9px;right:-6px;font-size:10px;font-weight:700;letter-spacing:.04em;padding:2px 7px;border-radius:999px;background:var(--canvas);border:1px solid color-mix(in srgb,var(--route) 45%,transparent);color:var(--route);white-space:nowrap}\n.x-step{flex:none;margin-left:-10px;margin-right:2px;align-self:flex-start;width:20px;height:20px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--muted);font-size:12px;line-height:1;position:relative;z-index:2}\n.add-step{flex:none;margin-left:10px;border:1.5px dashed var(--route);color:var(--route);background:transparent;border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:700}\n\n.board-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;margin-top:26px;font-size:12.5px;color:var(--muted)}\n.board-foot b{color:var(--ink)}\n\n/* library */\n.lib{max-width:1720px;margin:0 auto;padding:6px 24px 56px}\n.lib h2{font-size:11px;letter-spacing:.16em;color:var(--muted);font-weight:700;margin:0 0 12px;text-transform:uppercase}\n.lib-row{display:flex;flex-wrap:wrap;gap:8px}\n.lib-chip{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:6px 14px 6px 9px;font-size:13.5px;font-weight:700;border:1px solid var(--line);background:var(--surface);color:var(--ink);transition:transform .2s,box-shadow .2s}\n.lib-chip:hover{transform:translateY(-1px);box-shadow:var(--shadow-s)}\n.lib-chip small{color:var(--muted);font-size:11.5px;font-weight:400}\n.lib-new{border:1.5px dashed var(--ask);color:var(--ask);background:transparent}\n\n/* ---------- panel ---------- */\n.panel{--route:var(--ink);position:fixed;z-index:400;top:0;right:0;bottom:0;width:min(460px,100vw);background:var(--canvas);border-left:1px solid var(--line);box-shadow:-24px 0 60px rgba(10,20,30,.14);overflow-y:auto;overscroll-behavior:contain;padding:calc(env(safe-area-inset-top,0px) + 22px) 28px calc(env(safe-area-inset-bottom,0px) + 36px);transform:translateX(104%);visibility:hidden;transition:transform .45s var(--ease),visibility .45s}\n.panel.show{transform:none;visibility:visible}\n.p-bar{position:absolute;left:0;right:0;top:0;height:4px;background:var(--route);transition:background .3s}\n@media (min-width:1000px){.cm-app.panel-open{padding-right:460px}}\n@media (max-width:760px){\n  .panel{top:auto;left:0;width:100%;max-height:88vh;border-left:0;border-radius:24px 24px 0 0;transform:translateY(104%)}\n  .top,.stage,.lib,.banner{padding-left:16px;padding-right:16px}\n  .right{align-items:flex-start}.legend,.actions{justify-content:flex-start}\n}\n.swap{animation:swap .45s var(--ease) both}\n@keyframes swap{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}\n.p-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}\n.crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:4px 2px;font-size:12px;color:var(--muted);min-width:0;padding-top:6px}\n.crumbs .lead{font-weight:700;letter-spacing:.1em;font-size:10.5px;margin-right:6px;color:var(--faint)}\n.crumb{border:0;background:transparent;padding:2px 6px;border-radius:7px;color:var(--muted);font-size:12px}\n.crumb:hover{background:var(--surface-2);color:var(--ink)}\n.crumb.cur{color:var(--route);font-weight:700;background:color-mix(in srgb,var(--route) 10%,transparent)}\n.sep{color:var(--faint);font-size:11px}\n.x{flex:none;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--surface);font-size:15px;color:var(--muted);transition:transform .25s var(--ease),color .2s}\n.x:hover{transform:rotate(90deg);color:var(--ink)}\n.p-title{display:flex;align-items:center;gap:16px;margin:20px 0 4px}\n.p-ic{flex:none;width:60px;height:60px;border-radius:20px;display:grid;place-items:center;font-size:29px;background:color-mix(in srgb,var(--route) 12%,var(--surface));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--route) 22%,transparent)}\n.p-title .kd{font-size:10.5px;letter-spacing:.14em;color:var(--route);font-weight:700}\n.p-title h2{margin:2px 0 0;font-size:26px;line-height:1.2;font-weight:700;text-wrap:balance;outline:none}\n.share{display:inline-flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:var(--muted);background:var(--surface-2);border-radius:999px;padding:3px 10px}\n.sec{margin-top:26px}\n.sec-h{display:flex;align-items:center;gap:10px;margin:0 0 12px;font-size:13px;font-weight:700;letter-spacing:.06em}\n.sec-h .em{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;font-size:15px;background:var(--surface-2)}\n.sec-h small{font-weight:400;color:var(--faint);letter-spacing:0;font-size:12px}\n.sec-h::after{content:\"\";flex:1;height:1px;background:var(--line)}\n/* \u4f1a\u95ee */\n.asks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;position:relative}\n.asks.many::before{content:\"\";position:absolute;left:11px;top:18px;bottom:18px;width:2px;background:color-mix(in srgb,var(--ask) 25%,transparent);border-radius:2px}\n.ask{position:relative;display:flex;gap:12px;align-items:flex-start}\n.ask .n{flex:none;position:relative;z-index:1;width:24px;height:24px;border-radius:50%;background:var(--ask);color:var(--on-route);font-size:12px;font-weight:700;display:grid;place-items:center;margin-top:12px;box-shadow:0 0 0 4px var(--canvas)}\n.bubble{position:relative;flex:1;min-width:0;background:var(--ask-bg);border-radius:20px 20px 20px 6px;padding:14px 16px 14px 40px}\n.bubble::before{content:\"\\201C\";position:absolute;left:13px;top:6px;font-size:40px;line-height:1;color:color-mix(in srgb,var(--ask) 45%,transparent);font-weight:700}\n.bubble p{margin:0;font-size:16.5px;line-height:1.7;color:var(--ink)}\n.copy{float:right;margin:-4px -6px 4px 10px;border:1px solid transparent;background:var(--canvas);border-radius:999px;font-size:11px;font-weight:700;padding:3px 10px;color:var(--muted);transition:color .2s,border-color .2s}\n.copy:hover{border-color:var(--line);color:var(--ink)}\n/* \u4f1a\u7b54 */\n.ans{display:flex;flex-direction:column;gap:10px}\n.say{position:relative;margin:0;padding:13px 16px 13px 40px;border-radius:6px 20px 20px 20px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow-s);font-size:15.5px;line-height:1.75}\n.say::before{content:\"\\201C\";position:absolute;left:13px;top:6px;font-size:38px;line-height:1;color:color-mix(in srgb,var(--route) 50%,transparent);font-weight:700}\n.plain{margin:6px 0 0;font-size:12px;letter-spacing:.08em;color:var(--muted);font-weight:700}\n.ans ul{margin:0;padding:12px 16px 12px 32px;background:var(--surface-2);border-radius:16px;font-size:14.5px}\n.tip{margin:0;font-size:13px;color:var(--muted);display:flex;gap:8px;align-items:flex-start;background:var(--surface-2);border-radius:12px;padding:9px 12px}\n.tip::before{content:\"\u2726\";color:var(--route);font-size:11px;margin-top:2px}\n.notes{margin-top:16px;display:flex;flex-direction:column;gap:8px}\n/* visual blocks */\n.flowviz{display:flex;align-items:stretch;margin:2px 0 6px}\n.fv-step{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;padding:14px 8px 12px;border-radius:18px;background:color-mix(in srgb,var(--route) 7%,var(--surface));border:1px solid color-mix(in srgb,var(--route) 18%,transparent);animation:rise .5s var(--ease) both;animation-delay:var(--d,0s)}\n.fv-step .fi{font-size:28px;line-height:1.15}\n.fv-step b{font-size:13.5px;line-height:1.3}\n.fv-step span{font-size:11.5px;color:var(--muted);line-height:1.35}\n.fv-step:last-child{background:color-mix(in srgb,var(--route) 15%,var(--surface));border-color:color-mix(in srgb,var(--route) 42%,transparent)}\n.fv-arr{flex:none;align-self:center;width:22px;text-align:center;color:var(--route);font-weight:700}\n.mapviz{border-radius:20px;background:var(--surface-2);padding:8px;display:flex;flex-direction:column;gap:6px}\n.mv-h{font-size:11px;letter-spacing:.14em;color:var(--muted);font-weight:700;padding:6px 8px 2px}\n.mv-row{display:grid;grid-template-columns:44px minmax(0,1fr) 22px minmax(0,1.25fr);align-items:center;gap:8px;background:var(--surface);border-radius:14px;padding:8px 12px 8px 8px;box-shadow:var(--shadow-s);animation:rise .5s var(--ease) both;animation-delay:var(--d,0s)}\n.mv-row .mi{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;font-size:23px;background:color-mix(in srgb,var(--route) 10%,var(--surface))}\n.mv-row .mk{font-weight:700;font-size:15px}\n.mv-row .eq{color:var(--faint);text-align:center;font-weight:700}\n.mv-row .mvv{font-size:14.5px;font-weight:700;color:var(--route)}\n.factors{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}\n.factor{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 12px;font-size:14px;font-weight:700;animation:rise .5s var(--ease) both;animation-delay:var(--d,0s)}\n.factor .fi{font-size:19px}\n/* responses */\n.tabs{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:14px;padding:4px;background:var(--surface-2);border-radius:16px}\n.tab{flex:1 1 auto;border:0;background:transparent;border-radius:12px;padding:8px 12px;font-size:14px;font-weight:700;color:var(--muted);transition:background .25s,color .25s,box-shadow .25s}\n.tab:hover{color:var(--ink)}\n.tab[aria-selected=\"true\"]{background:var(--surface);color:var(--route);box-shadow:var(--shadow-s)}\n.resp{display:flex;flex-direction:column;gap:16px;animation:swap .4s var(--ease) both}\n.resp h4{margin:0 0 10px;font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.08em}\n.go-resp{align-self:flex-start;border:0;background:var(--route);color:var(--on-route);border-radius:999px;padding:9px 16px;font-size:13.5px;font-weight:700;transition:transform .25s var(--ease)}\n.go-resp:hover{transform:translateX(3px)}\n/* flow footer */\n.flow{margin-top:30px;padding-top:20px;border-top:1px solid var(--line)}\n.flow-h{font-size:11px;letter-spacing:.14em;color:var(--faint);font-weight:700;margin-bottom:10px}\n.flow-opts{display:flex;flex-direction:column;gap:8px}\n.go{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;border:1.5px solid var(--line);background:var(--surface);border-radius:16px;padding:12px 16px;transition:border-color .2s,transform .25s var(--ease),box-shadow .25s}\n.go:hover{border-color:var(--route);transform:translateX(3px);box-shadow:var(--shadow-s)}\n.go span{font-size:12.5px;color:var(--muted)}\n.go b{font-size:15px;display:flex;align-items:center;gap:8px}\n.go.main{background:var(--route);border-color:var(--route);color:var(--on-route)}\n.go.main span{color:var(--on-route);opacity:.8}\n.go-small{border:0;background:transparent;color:var(--muted);font-size:13px;padding:10px 0 0}\n.go-small:hover{color:var(--ink)}\n\n/* editor */\n.ed{display:flex;flex-direction:column;gap:14px;margin-top:18px}\n.ed label{display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--muted);font-weight:700}\n.ed input,.ed select,.ed textarea{width:100%;border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:9px 11px;font-size:14.5px;color:var(--ink);font-weight:400}\n.ed textarea{min-height:90px;resize:vertical;line-height:1.6}\n.ed .help{font-size:12px;color:var(--muted);line-height:1.9;background:var(--surface-2);border-radius:12px;padding:10px 12px}\n.ed .help code{background:var(--canvas);border:1px solid var(--line);border-radius:5px;padding:0 5px;font-family:var(--font);color:var(--ink)}\n.ed-two{display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px}\n.ed-resp{border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px}\n.ed-row{display:flex;flex-wrap:wrap;gap:8px}\n.ed-note{font-size:13px;background:color-mix(in srgb,var(--route) 9%,var(--surface));border-radius:12px;padding:9px 12px}\n.danger{border:1px solid var(--rD);color:var(--rD);background:transparent;border-radius:999px;padding:5px 12px;font-size:13px;font-weight:700}\n\n.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 24px);transform:translate(-50%,20px);opacity:0;z-index:410;background:var(--ink);color:var(--canvas);border-radius:999px;padding:10px 20px;font-size:14px;font-weight:700;pointer-events:none;transition:opacity .25s,transform .3s var(--ease);max-width:calc(100vw - 32px);text-align:center}\n.toast.show{opacity:1;transform:translate(-50%,0)}\n\n@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}.wires.intro path{stroke-dasharray:none;stroke-dashoffset:0}}\n.chip.twin-h{border-color:var(--route);border-style:dashed;box-shadow:var(--shadow-m);opacity:1!important}\n\n[hidden]{display:none!important}\n.top{padding-left:8px;padding-right:8px}.stage{padding-left:4px;padding-right:4px}.lib{padding-left:8px;padding-right:8px}.banner{padding-left:8px;padding-right:8px}\n";</script>
+<script>
+(function(){
+var HOST=document.getElementById('app-callmap');if(!HOST||HOST.shadowRoot)return;var ROOT=HOST.attachShadow({mode:'open'});var $=function(s,r){return (r||ROOT).querySelector(s)};
+var $$=function(s,r){return Array.prototype.slice.call((r||ROOT).querySelectorAll(s))};
+var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
+var SAVED;
+try{SAVED=JSON.parse(document.getElementById('callmap-data').textContent)}catch(e){HOST.textContent='会问会答 Map 资料读取失败';return}
+var STY=document.createElement('style');STY.textContent=CALLMAP_CSS;ROOT.appendChild(STY);
+function syncTheme(){var t=document.documentElement.getAttribute('data-theme');if(t)HOST.setAttribute('data-theme',t);else HOST.removeAttribute('data-theme')}syncTheme();try{new MutationObserver(syncTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']})}catch(e){}
+function clone(o){return JSON.parse(JSON.stringify(o))}
+var data=clone(SAVED);
+var KIND={customer:'客户回答',question:'CSC 问',knowledge:'会答 · 解释',closing:'Closing',need:'找需求'};
+var KICON={customer:'🙋',question:'💬',knowledge:'💡',closing:'🤝',need:'🎯'};
+var S={open:null,active:null,ctx:{},editing:false,dirty:false,resp:{},mode:'view',addPath:null,db:null,unlocked:false,canEdit:false,draft:null,intro:true,last:null};
+try{if(sessionStorage.getItem('callmap_admin')==='1')S.unlocked=true}catch(e){}
+
+/* ---------- structure ---------- */
+function idx(){var parent={},leafOf={};(function walk(t,p){if(t.path){var n=data.paths[t.path].node;parent[n]=p;leafOf[n]=t.path;return}parent[t.id]=p;(t.children||[]).forEach(function(c){walk(c,t.id)})})(data.tree,null);return {parent:parent,leafOf:leafOf}}
+function treeNode(id){var f=null;(function w(t){if(f)return;if(t.id===id)f=t;(t.children||[]).forEach(w)})(data.tree);return f}
+function ancestors(id){var p=idx().parent,out=[],c=id;while(c){out.unshift(c);c=p[c]}return out}
+function usage(id){return Object.keys(data.paths).filter(function(p){return data.paths[p].chain.indexOf(id)>-1})}
+function isModule(id){return !(id in idx().parent)}
+function trail(){var a=S.active,c=S.ctx;if(!a||!data.nodes[a])return [];if(c.path&&data.paths[c.path]){var p=data.paths[c.path],base=ancestors(p.node);return c.idx>=0?base.concat(p.chain.slice(0,c.idx+1)):base}if(!isModule(a))return ancestors(a);return [a]}
+function N(id){return data.nodes[id]||{label:'(已删除)',kind:'knowledge'}}
+function icon(id){var n=N(id);return n.icon||KICON[n.kind]||'💡'}
+function rvar(pid){var p=data.paths[pid];return 'var(--r'+((p&&p.color)||'A')+')'}
+
+/* ---------- shell ---------- */
+var APP=document.createElement('div');APP.className='cm-app';ROOT.appendChild(APP);APP.innerHTML='<div id="top"></div><div id="banner" class="banner"></div><main class="stage"><div class="board-scroll" id="boardScroll"><div class="board" id="board"></div></div></main><section class="lib" id="lib"></section><aside class="panel" id="panel" aria-label="会问会答内容"></aside><div class="toast" id="toast" role="status" aria-live="polite"></div>';
+
+function renderTop(){
+  var a='';
+  if(S.db){
+    a+='<button class="btn'+(S.editing?' on':'')+'" data-act="edit">'+(S.editing?'✓ 编辑模式中':'✎ 编辑内容')+'</button>';
+    if(S.dirty)a+='<span class="dirty-note">有未保存的修改</span><button class="btn" data-act="discard">放弃修改</button><button class="btn primary" data-act="save">保存</button>';
+  }
+  $('#top').innerHTML='<header class="top"><div class="brand"><div class="eyebrow">UR KLINIK · CSC Training</div><h1>CSC Calling Thinking Map<em>会问 + 会答</em></h1>'+
+  '<p class="sub"><span class="st">客户说 <b>这个</b></span><span class="arrow">→</span><span class="st">💬 我 <b>问</b> 什么</span><span class="arrow">→</span><span class="st">客户 <b>回答</b></span><span class="arrow">→</span><span class="st">🧠 我 <b>答</b> 什么</span><span class="arrow">→</span><span class="st">下一步去 <b>哪里</b></span></p></div>'+
+  '<div class="right"><div class="legend"><span><i class="lg lg-c"></i>客户状态 / 回答</span><span><i class="lg lg-q"></i>CSC 会问</span><span><i class="lg lg-k"></i>会答 · 解释</span><span><i class="lg lg-n"></i>需求点</span><span><i class="lg lg-x"></i>Closing</span></div>'+(a?'<div class="actions">'+a+'</div>':'')+'</div></header>';
+  $('#banner').innerHTML=S.offline?'<div><span>'+esc(S.offline)+'</span></div>':S.draft&&S.canEdit?'<div><span>你上次有一些修改没保存成功。</span><button class="btn" data-act="restoreDraft">恢复那些修改</button><button class="btn" data-act="dropDraft">不要了</button></div>':'';
+}
+
+/* ---------- map ---------- */
+function layout(){var cells=[],row=0,leafCol=0;
+  (function walk(t,depth){if(t.path){row++;leafCol=Math.max(leafCol,depth);cells.push({lane:t.path,r0:row,r1:row,col:depth});return [row,row]}
+    var a=null,b=null;(t.children||[]).forEach(function(c){var x=walk(c,depth+1);if(a===null)a=x[0];b=x[1]});if(a===null){row++;a=b=row}
+    cells.push({id:t.id,r0:a,r1:b,col:depth});return [a,b]})(data.tree,0);
+  return {cells:cells,leafCol:leafCol}}
+function treeBtn(id,col,isRoot,tr){var n=N(id),act=S.active===id&&!(S.ctx.path),on=!act&&tr.indexOf(id)>-1;
+  var cls=isRoot?'n-root':(n.kind==='question'?'n-q':'n-c');
+  var eb=isRoot?'START':(n.kind==='question'?'💬 CSC 问':'客户说');
+  return '<button class="nd '+cls+(act?' active':'')+(on?' on-trail':'')+(S.intro?' reveal':'')+'" style="--d:'+(col*0.12)+'s" data-node="'+id+'" data-tid="'+id+'"><span class="eb">'+eb+'</span><span class="lb">'+esc(n.label)+'</span>'+(n.hint&&(isRoot||n.kind==='question')?'<span class="hn">'+esc(n.hint)+'</span>':'')+'</button>'}
+function laneHTML(pid,col){var p=data.paths[pid],c=S.ctx,inPath=c.path===pid&&S.active;
+  var leafAct=inPath&&c.idx===-1&&S.active===p.node,leafOn=inPath&&c.idx>=0;var ln=N(p.node);var base=(col+1)*0.12;
+  var h='<span class="lane-id"><b>'+esc(pid)+'</b>'+esc(p.name)+'</span>'+
+  '<button class="nd n-leaf'+(leafAct?' active':'')+(leafOn?' on-trail':'')+(inPath&&!leafAct&&!leafOn?' ahead':'')+(S.intro?' reveal':'')+'" style="--d:'+base+'s" data-node="'+p.node+'" data-path="'+pid+'" data-idx="-1" data-leafnode="'+pid+'"><span class="eb">客户：</span><span class="lb">'+esc(ln.label)+'</span>'+(ln.hint?'<span class="hn">💬 '+esc(ln.hint)+'</span>':'')+'</button>';
+  p.chain.forEach(function(id,i){var n=N(id);var act=inPath&&c.idx===i&&S.active===id,on=inPath&&c.idx>i,ahead=inPath&&c.idx<i,twin=!inPath&&S.active===id;
+    var sh=usage(id).length>1&&n.kind!=='closing'?'<span class="shared">共用</span>':'';
+    h+='<span class="link'+(inPath&&c.idx>=i?' hot':'')+'"></span><button class="nd chip k-'+n.kind+(act?' active':'')+(on?' on-trail':'')+(ahead?' ahead':'')+(twin?' twin':'')+(S.intro?' reveal':'')+'" style="--d:'+(base+0.1+i*0.07)+'s" data-node="'+id+'" data-path="'+pid+'" data-idx="'+i+'"><span class="ic">'+esc(icon(id))+'</span><span class="lb">'+esc(n.label)+(n.kind==='need'&&n.hint?'<span class="sm">'+esc(n.hint)+'</span>':'')+'</span>'+sh+'</button>';
+    if(S.editing)h+='<button class="x-step" data-act="removeStep" data-path="'+pid+'" data-idx="'+i+'" title="从路线移除" aria-label="从路线移除">×</button>'});
+  if(S.editing)h+='<button class="add-step" data-act="addStep" data-path="'+pid+'">+ 加一步</button>';
+  return h}
+var WIDTHS=[118,106,78];
+function renderMap(){var L=layout(),tr=trail();var cols=[];for(var i=0;i<L.leafCol;i++)cols.push((WIDTHS[i]||110)+'px');cols.push('minmax(0,1fr)');
+  var h='<svg class="wires'+(S.intro?' intro':'')+'" id="wires" aria-hidden="true"></svg><div class="grid" style="grid-template-columns:'+cols.join(' ')+'">';
+  L.cells.forEach(function(c){var gr='grid-row:'+c.r0+' / '+(c.r1+1)+';';
+    if(c.lane){var on=S.active&&S.ctx.path===c.lane;h+='<div class="cell lane'+(on?' lane-on':'')+'" data-lane="'+c.lane+'" style="'+gr+'grid-column:'+(c.col+1)+' / -1;--route:'+rvar(c.lane)+'">'+laneHTML(c.lane,c.col)+'</div>'}
+    else h+='<div class="cell" style="'+gr+'grid-column:'+(c.col+1)+'">'+treeBtn(c.id,c.col,c.id===data.tree.id,tr)+'</div>'});
+  h+='</div><div class="board-foot"><span>点任何节点 → 右边马上看到 <b>💬 会问</b> + <b>🧠 会答</b></span><span>标着「共用」的卡片，A 和 C 用同一套内容</span></div>';
+  var b=$('#board');b.className='board'+(S.active?' focus':'');b.innerHTML=h;drawWires()}
+function drawWires(){var b=$('#board'),svg=$('#wires');if(!b||!svg)return;var br=b.getBoundingClientRect();svg.setAttribute('width',b.offsetWidth);svg.setAttribute('height',b.offsetHeight);
+  var tr=trail(),route=S.ctx.path?rvar(S.ctx.path):'var(--ink)',out='',k=0;
+  (function walk(t){if(!t.children)return;var pe=b.querySelector('[data-tid="'+t.id+'"]');if(!pe)return;var pr=pe.getBoundingClientRect();
+    t.children.forEach(function(ch){var ce=ch.path?b.querySelector('[data-leafnode="'+ch.path+'"]'):b.querySelector('[data-tid="'+ch.id+'"]');if(!ce)return;var cr=ce.getBoundingClientRect();
+      var x1=pr.right-br.left,y1=pr.top+pr.height/2-br.top,x2=cr.left-br.left-(ch.path?16:0),y2=cr.top+cr.height/2-br.top,mx=(x1+x2)/2;
+      var cid=ch.path?data.paths[ch.path].node:ch.id;var hot=tr.indexOf(t.id)>-1&&tr.indexOf(cid)>-1&&(!ch.path||S.ctx.path===ch.path);
+      var cls=(ch.path?'rt':'')+(hot?' hot':'');var rc=hot?route:(ch.path?rvar(ch.path):'');
+      out+='<path pathLength="1" class="'+cls+'" style="--d:'+(0.1+k*0.05)+'s;'+(rc?'--rc:'+rc:'')+'" d="M'+x1+','+y1+' C'+mx+','+y1+' '+mx+','+y2+' '+x2+','+y2+'"/>';k++;
+      if(!ch.path)walk(ch)})})(data.tree);
+  svg.innerHTML=out}
+function renderLib(){var ids=Object.keys(data.nodes).filter(isModule);
+  var h='<h2>全部卡片 · 点开就看</h2><div class="lib-row">'+ids.map(function(id){var n=N(id),u=usage(id).length;return '<button class="lib-chip" data-node="'+id+'"><span>'+esc(icon(id))+'</span>'+esc(n.label)+' <small>'+(u?'用在 '+u+' 条路线':'还没放进路线')+'</small></button>'}).join('');
+  if(S.editing)h+='<button class="lib-chip lib-new" data-act="newCard">+ 新卡片</button>';
+  $('#lib').innerHTML=h+'</div>'}
+
+/* ---------- answer format → visuals ---------- */
+var EMO=/^(\p{Extended_Pictographic}️?)\s*(.*)$/u;
+function splitIcon(s){var m=s.match(EMO);return m?[m[1],m[2]]:['',s]}
+function parseAnswer(t){var lines=String(t||'').split('\n'),main=[],tips=[],list=[],pairs=[],k=0;
+  function flush(){
+    if(list.length){var allE=list.every(function(x){return EMO.test(x)});
+      main.push(allE?'<div class="factors">'+list.map(function(x,i){var p=splitIcon(x);return '<div class="factor" style="--d:'+(i*0.06)+'s"><span class="fi">'+esc(p[0])+'</span>'+esc(p[1])+'</div>'}).join('')+'</div>':'<ul>'+list.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>');list=[]}
+    if(pairs.length){main.push('<div class="mapviz"><div class="mv-h">一看就懂</div>'+pairs.map(function(p,i){var a=splitIcon(p[0]);return '<div class="mv-row" style="--d:'+(i*0.08)+'s"><span class="mi">'+esc(a[0]||'•')+'</span><span class="mk">'+esc(a[1])+'</span><span class="eq">=</span><span class="mvv">'+esc(p[1])+'</span></div>'}).join('')+'</div>');pairs=[]}}
+  lines.forEach(function(l){var s=l.trim(),m;if(!s){flush();return}
+    if(/^[-•]\s/.test(s)){if(pairs.length)flush();list.push(s.replace(/^[-•]\s*/,''));return}
+    if(s.indexOf('~ ')===0){flush();var st=s.slice(2).split('→').map(function(x){return x.trim()}).filter(Boolean);
+      main.push('<div class="flowviz">'+st.map(function(x,i){var q=x.split('|'),p=splitIcon(q[0].trim());return (i?'<span class="fv-arr">→</span>':'')+'<div class="fv-step" style="--d:'+(i*0.1)+'s">'+(p[0]?'<span class="fi">'+esc(p[0])+'</span>':'')+'<b>'+esc(p[1])+'</b>'+(q[1]?'<span>'+esc(q[1].trim())+'</span>':'')+'</div>'}).join('')+'</div>');return}
+    if((m=s.match(/^(.{1,18}?)\s+=\s+(.+)$/))){if(list.length)flush();pairs.push([m[1],m[2]]);return}
+    flush();
+    if(s.indexOf('> ')===0||s==='>'){tips.push('<p class="tip">'+esc(s.replace(/^>\s?/,''))+'</p>');return}
+    if(s[0]==='「'){var inner=s.slice(1);if(inner.slice(-1)==='」')inner=inner.slice(0,-1);main.push('<p class="say">'+esc(inner)+'</p>');return}
+    main.push('<p class="plain">'+esc(s)+'</p>')});
+  flush();return {main:main.join(''),tips:tips.join('')}}
+function asksList(lines){var many=lines.length>1;return '<ol class="asks'+(many?' many':'')+'">'+lines.map(function(l,i){return '<li class="ask">'+(many?'<span class="n">'+(i+1)+'</span>':'')+'<div class="bubble"><button class="copy" data-act="copy" data-text="'+esc(l)+'">复制</button><p>'+esc(l)+'</p></div></li>'}).join('')+'</ol>'}
+function secH(em,t,small){return '<h3 class="sec-h"><span class="em">'+em+'</span>'+t+(small?' <small>'+small+'</small>':'')+'</h3>'}
+
+/* ---------- panel ---------- */
+function ctxFor(x){var c=S.ctx;if(c.path&&data.paths[c.path]){var p=data.paths[c.path];if(x===p.node)return {path:c.path,idx:-1};var i=p.chain.indexOf(x);if(i>-1&&i<=c.idx)return {path:c.path,idx:i}}var l=idx().leafOf[x];if(l)return {path:l,idx:-1};return {}}
+function goAttrs(id,c){return ' data-go="'+id+'" data-gpath="'+(c&&c.path||'')+'" data-gidx="'+(c&&c.idx!=null?c.idx:'')+'"'}
+function headHTML(title){var tr=trail();
+  var cr=tr.map(function(x,i){var cur=i===tr.length-1;return '<button class="crumb'+(cur?' cur':'')+'"'+goAttrs(x,ctxFor(x))+'>'+esc(N(x).label)+'</button>'}).join('<span class="sep">›</span>');
+  return '<div class="p-bar"></div><div class="p-head"><div class="crumbs"><span class="lead">你在这里</span>'+(title||cr)+'</div><button class="x" data-act="close" aria-label="关闭">✕</button></div>'}
+function flowOpts(){var id=S.active,c=S.ctx,n=N(id),tn=treeNode(id),li=idx().leafOf,opts=[],h='',prev=null;
+  if(tn&&tn.children){h='客户怎么回答？选一个往下走';tn.children.forEach(function(ch){var nid=ch.path?data.paths[ch.path].node:ch.id;opts.push({id:nid,c:ch.path?{path:ch.path,idx:-1}:{},sub:'客户说「'+N(nid).label+'」',b:ch.path?ch.path+' · '+data.paths[ch.path].name:N(nid).label})})}
+  else if(li[id]){var p=data.paths[li[id]];h='下一步';if(p.chain[0])opts.push({id:p.chain[0],c:{path:li[id],idx:0},sub:n.nextWhen||'接下来',b:icon(p.chain[0])+' '+N(p.chain[0]).label,main:1})}
+  else if(c.path&&data.paths[c.path]){var ch=data.paths[c.path].chain,i=c.idx;h='情景 '+c.path+' · 第 '+(i+1)+' / '+ch.length+' 步';
+    if(ch[i+1])opts.push({id:ch[i+1],c:{path:c.path,idx:i+1},sub:'下一步',b:icon(ch[i+1])+' '+N(ch[i+1]).label,main:1});
+    prev=i>0?{id:ch[i-1],c:{path:c.path,idx:i-1},b:N(ch[i-1]).label}:{id:data.paths[c.path].node,c:{path:c.path,idx:-1},b:'情景 '+c.path+' 开头'}}
+  else{var u=usage(id);h=u.length?'在路线里看这张卡':'这张卡还没放进任何路线';u.forEach(function(p){opts.push({id:id,c:{path:p,idx:data.paths[p].chain.indexOf(id)},sub:'情景 '+p,b:data.paths[p].name})})}
+  if(!opts.length&&!prev)return '';
+  return '<div class="flow"><div class="flow-h">'+esc(h)+'</div><div class="flow-opts">'+opts.map(function(o){return '<button class="go'+(o.main?' main':'')+'"'+goAttrs(o.id,o.c)+'><span>'+esc(o.sub)+'</span><b>'+esc(o.b)+' →</b></button>'}).join('')+'</div>'+(prev?'<button class="go-small"'+goAttrs(prev.id,prev.c)+'>← 上一步：'+esc(prev.b)+'</button>':'')+'</div>'}
+function titleHTML(id,kd){var n=N(id),u=usage(id);return '<div class="p-title"><span class="p-ic">'+esc(icon(id))+'</span><div><div class="kd">'+esc(kd||KIND[n.kind])+'</div><h2 tabindex="-1">'+esc(n.label)+'</h2>'+(u.length>1?'<span class="share">↔ 共用卡片 · '+u.map(function(p){return p+' '+esc(data.paths[p].name)}).join(' / ')+'</span>':'')+'</div></div>'}
+function respHTML(id){var n=N(id),r=n.responses||[];if(!r.length)return '';var sel=Math.min(S.resp[id]||0,r.length-1),x=r[sel],a=parseAnswer(x.answer);
+  return '<section class="sec">'+secH('🙋','客户怎么回答？','按她真正的回答选')+'<div class="tabs" role="tablist">'+r.map(function(q,i){return '<button class="tab" role="tab" aria-selected="'+(i===sel)+'" data-act="respTab" data-i="'+i+'">'+esc(q.when)+'</button>'}).join('')+'</div>'+
+  '<div class="resp" role="tabpanel">'+((x.ask&&x.ask.length)?'<div><h4>💬 会问</h4>'+asksList(x.ask)+'</div>':'')+(a.main?'<div><h4>🧠 会答</h4><div class="ans">'+a.main+'</div></div>':'')+(a.tips?'<div class="notes" style="margin:0">'+a.tips+'</div>':'')+
+  (x.go&&data.nodes[x.go]?'<button class="go-resp"'+goAttrs(x.go,respCtx(x.go))+'>接下来 → '+esc(icon(x.go))+' '+esc(N(x.go).label)+'</button>':'')+'</div></section>'}
+function viewHTML(){var id=S.active,n=N(id),a=parseAnswer(n.answer);
+  var h=headHTML()+'<div class="pb">'+titleHTML(id);
+  if(n.ask&&n.ask.length)h+='<section class="sec">'+secH('💬','会问',n.ask.length>1?'按顺序问':'')+asksList(n.ask)+'</section>';
+  if(a.main)h+='<section class="sec">'+secH('🧠','会答')+'<div class="ans">'+a.main+'</div></section>';
+  h+=respHTML(id);
+  if(a.tips)h+='<div class="notes">'+a.tips+'</div>';
+  if((!n.ask||!n.ask.length)&&!n.answer&&!(n.responses||[]).length)h+='<p class="tip" style="margin-top:20px">这张卡还没有内容。</p>';
+  return h+flowOpts()+'</div>'}
+function respCtx(go){var c=S.ctx;if(c.path&&data.paths[c.path]){var i=data.paths[c.path].chain.indexOf(go);if(i>-1)return {path:c.path,idx:i}}var u=usage(go);return u.length?{path:u[0],idx:data.paths[u[0]].chain.indexOf(go)}:{}}
+
+function editHTML(){var id=S.active,n=N(id),u=usage(id),isLeaf=!!idx().leafOf[id],mod=isModule(id);
+  var opts=function(sel){return '<option value="">（不跳）</option>'+Object.keys(data.nodes).filter(isModule).map(function(k){return '<option value="'+k+'"'+(k===sel?' selected':'')+'>'+esc(N(k).label)+(N(k).hint?' — '+esc(N(k).hint):'')+'</option>'}).join('')};
+  var h=headHTML()+'<div class="pb">'+titleHTML(id,'编辑中 · 打字会马上更新地图，记得按「保存」');
+  if(u.length>1)h+='<div class="ed-note" style="margin-top:14px">这张卡共用在 '+u.join('、')+' 路线。改这里，几条路线会一起更新。</div>';
+  h+='<div class="ed"><div class="ed-two"><label>图标<input id="f-icon" data-f="icon" value="'+esc(n.icon||'')+'" placeholder="'+esc(KICON[n.kind])+'"></label><label>名称（地图上的字）<input id="f-label" data-f="label" value="'+esc(n.label)+'"></label></div>'+
+  '<label>地图小字（一句提示，可留空）<input id="f-hint" data-f="hint" value="'+esc(n.hint||'')+'"></label>'+
+  '<label>类型（决定样子）<select id="f-kind" data-f="kind">'+Object.keys(KIND).map(function(k){return '<option value="'+k+'"'+(k===n.kind?' selected':'')+'>'+KIND[k]+'</option>'}).join('')+'</select></label>'+
+  '<label>💬 会问（一行一句，按顺序）<textarea id="f-ask" data-f="ask" rows="3">'+esc((n.ask||[]).join('\n'))+'</textarea></label>'+
+  '<label>🧠 会答<textarea id="f-answer" data-f="answer" rows="8">'+esc(n.answer||'')+'</textarea></label>'+
+  '<div class="help">写法小提示：<br><code>「…」</code> 开头 = 对客户说的话<br><code>~ 🌳 树 | 小字 → ✂️ 剪刀 | 小字</code> = 流程图<br><code>🍂 枯叶 = 斑 / 黑色素</code> = 比喻对照卡<br><code>- 🔥 慢性发炎</code> = 因素格（不加图标就是普通列点）<br><code>&gt; </code> 开头 = 给 CSC 的小提醒</div>'+
+  (isLeaf?'<label>进入下一步的条件（例如：客户说会担心）<input id="f-next" data-f="nextWhen" value="'+esc(n.nextWhen||'')+'"></label>':'')+
+  '<div class="sec" style="margin-top:6px">'+secH('🙋','客户回应','客户可能怎么回答，每种怎么接')+'<div style="display:flex;flex-direction:column;gap:10px">'+
+  (n.responses||[]).map(function(r,i){return '<div class="ed-resp"><label>客户说<input id="f-rw'+i+'" data-f="r.when" data-i="'+i+'" value="'+esc(r.when)+'"></label><label>💬 会问（一行一句）<textarea id="f-ra'+i+'" data-f="r.ask" data-i="'+i+'" rows="2">'+esc((r.ask||[]).join('\n'))+'</textarea></label><label>🧠 会答<textarea id="f-rn'+i+'" data-f="r.answer" data-i="'+i+'" rows="3">'+esc(r.answer||'')+'</textarea></label><label>接着去哪张卡<select id="f-rg'+i+'" data-f="r.go" data-i="'+i+'">'+opts(r.go)+'</select></label><div><button class="danger" data-act="delResp" data-i="'+i+'">删掉这个回应</button></div></div>'}).join('')+
+  '<div><button class="btn" data-act="addResp">+ 加一个客户回应</button></div></div></div>';
+  var c=S.ctx,row='';
+  if(c.path&&c.idx>=0)row+='<button class="danger" data-act="removeStep" data-path="'+c.path+'" data-idx="'+c.idx+'">从情景 '+c.path+' 移除这一步</button>';
+  if(mod&&!u.length)row+='<button class="danger" data-act="delCard">删除这张卡</button>';
+  if(row)h+='<div class="ed-row">'+row+'</div>';
+  return h+'</div></div>'}
+function addHTML(){var pid=S.addPath,p=data.paths[pid],ch=p.chain;var def=ch.length&&N(ch[ch.length-1]).kind==='closing'?ch.length-1:ch.length;
+  var pos=ch.map(function(id,i){return '<option value="'+i+'"'+(i===def?' selected':'')+'>放在「'+esc(N(id).label)+'」之前</option>'}).join('')+'<option value="'+ch.length+'"'+(def===ch.length?' selected':'')+'>放在最后</option>';
+  return headHTML('情景 '+esc(pid)+' · '+esc(p.name))+'<div class="pb"><div class="p-title"><span class="p-ic">＋</span><div><div class="kd">情景 '+esc(pid)+'</div><h2 tabindex="-1">加一步</h2></div></div><div class="ed">'+
+  '<label>放在哪里<select id="a-pos">'+pos+'</select></label>'+
+  '<div class="ed-resp"><label>用现有的卡片（可以共用）<select id="a-pick">'+Object.keys(data.nodes).filter(isModule).map(function(k){return '<option value="'+k+'">'+esc(icon(k))+' '+esc(N(k).label)+(N(k).hint?' — '+esc(N(k).hint):'')+'</option>'}).join('')+'</select></label><div><button class="btn primary" data-act="insertStep">加进路线</button></div></div>'+
+  '<div class="ed-resp"><label>或者建一张新卡片<input id="a-label" placeholder="例如：价钱"></label><label>类型<select id="a-kind">'+Object.keys(KIND).map(function(k){return '<option value="'+k+'"'+(k==='knowledge'?' selected':'')+'>'+KIND[k]+'</option>'}).join('')+'</select></label><div><button class="btn primary" data-act="createStep">建立并加进路线</button></div></div></div></div>'}
+function loginHTML(){return '<div class="p-bar"></div><div class="p-head"><div class="crumbs"><span class="lead">编辑内容</span></div><button class="x" data-act="close" aria-label="关闭">✕</button></div><div class="pb"><div class="p-title"><span class="p-ic">🔒</span><div><div class="kd">只有管理员可以改</div><h2 tabindex="-1">输入 Admin 密码</h2></div></div><div class="ed"><label>跟 Performance Dashboard 的 Admin 密码一样<input type="password" id="cm-pw" autocomplete="current-password"></label><p class="tip" id="cm-lerr" hidden></p><div><button class="btn primary" data-act="login">进入编辑</button></div></div></div>'}
+function renderPanel(focus){var el=$('#panel');
+  if(S.mode!=='add'&&S.mode!=='login'&&(!S.active||!data.nodes[S.active])){el.classList.remove('show');APP.classList.remove('panel-open');S.last=null;return}
+  var key=S.mode+'|'+S.active+'|'+(S.ctx.path||'')+'|'+S.ctx.idx+'|'+S.editing;
+  el.style.setProperty('--route',S.mode==='login'?'var(--ink)':S.mode==='add'?rvar(S.addPath):(S.ctx.path?rvar(S.ctx.path):'var(--ink)'));
+  el.innerHTML=S.mode==='login'?loginHTML():S.mode==='add'?addHTML():(S.editing?editHTML():viewHTML());
+  var pb=el.querySelector('.pb');if(pb&&key!==S.last)pb.classList.add('swap');S.last=key;
+  el.classList.add('show');APP.classList.add('panel-open');
+  if(focus){el.scrollTop=0;var h=el.querySelector('h2');if(h)h.focus({preventScroll:true})}}
+
+/* ---------- actions ---------- */
+function stopIntro(){if(S.intro){S.intro=false}}
+function openNode(id,c){stopIntro();S.mode='view';S.active=id;S.ctx=c||{};renderMap();renderPanel(true);
+  var el=S.ctx.path?$('#board [data-node="'+id+'"][data-path="'+S.ctx.path+'"][data-idx="'+S.ctx.idx+'"]'):$('#board [data-tid="'+id+'"]');if(el&&el.scrollIntoView)setTimeout(function(){el.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'})},420)}
+function dirty(){if(!S.dirty){S.dirty=true;renderTop()}}
+function closePanel(){S.active=null;S.ctx={};S.mode='view';renderPanel();renderMap()}
+var tt;function toast(m){var t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(function(){t.classList.remove('show')},3200)}
+function newId(){return 'n'+Date.now().toString(36)+Math.floor(Math.random()*99)}
+
+ROOT.addEventListener('click',function(e){
+  var t=e.target.closest('[data-node],[data-go],[data-act]');if(!t)return;
+  if(t.dataset.act==='copy'){var txt=t.dataset.text;try{navigator.clipboard.writeText(txt).then(function(){t.textContent='已复制 ✓';setTimeout(function(){t.textContent='复制'},1400)},function(){selectText(t)})}catch(err){selectText(t)}return}
+  if(t.dataset.node){var c=t.dataset.path?{path:t.dataset.path,idx:+t.dataset.idx}:{};if(!c.path){var l=idx().leafOf[t.dataset.node];if(l)c={path:l,idx:-1}}openNode(t.dataset.node,c);return}
+  if(t.dataset.go){openNode(t.dataset.go,t.dataset.gpath?{path:t.dataset.gpath,idx:t.dataset.gidx===''?-1:+t.dataset.gidx}:{});return}
+  var a=t.dataset.act,n=data.nodes[S.active];stopIntro();
+  if(a==='close')closePanel();
+  else if(a==='edit'&&!S.unlocked&&!S.editing){S.mode='login';S.active=null;renderPanel(true);var pw=$('#cm-pw');if(pw)setTimeout(function(){pw.focus()},300)}
+  else if(a==='login')login();
+  else if(a==='edit'){S.editing=!S.editing;if(S.mode==='add'&&!S.editing)closePanel();renderTop();renderMap();renderLib();renderPanel();if(S.editing&&!S.active)toast('点任何节点，就可以改它的内容')}
+  else if(a==='respTab'){S.resp[S.active]=+t.dataset.i;renderPanel()}
+  else if(a==='addResp'&&n){n.responses=(n.responses||[]).concat([{when:'新的回应',ask:[],answer:''}]);dirty();renderPanel()}
+  else if(a==='delResp'&&n){n.responses.splice(+t.dataset.i,1);dirty();renderPanel()}
+  else if(a==='removeStep'){var pp=data.paths[t.dataset.path],i=+t.dataset.idx;var gone=pp.chain.splice(i,1)[0];dirty();if(S.ctx.path===t.dataset.path&&S.ctx.idx===i)closePanel();else{renderMap();renderPanel()}renderLib();toast('已移除「'+N(gone).label+'」。按「放弃修改」可以还原')}
+  else if(a==='addStep'){S.mode='add';S.addPath=t.dataset.path;S.active=null;renderMap();renderPanel(true)}
+  else if(a==='insertStep'||a==='createStep'){var pid=S.addPath,pos=+$('#a-pos').value,id;
+    if(a==='insertStep')id=$('#a-pick').value;else{var lb=$('#a-label').value.trim();if(!lb){toast('先写新卡片的名称');return}id=newId();data.nodes[id]={label:lb,hint:'',kind:$('#a-kind').value,ask:[],answer:''}}
+    data.paths[pid].chain.splice(pos,0,id);dirty();renderLib();openNode(id,{path:pid,idx:pos})}
+  else if(a==='newCard'){var nid=newId();data.nodes[nid]={label:'新卡片',hint:'',kind:'knowledge',ask:[],answer:''};dirty();renderLib();openNode(nid,{})}
+  else if(a==='delCard'){delete data.nodes[S.active];dirty();closePanel();renderLib()}
+  else if(a==='discard'){data=clone(SAVED);S.dirty=false;S.resp={};if(S.active&&!data.nodes[S.active])S.active=null;S.mode='view';renderTop();renderMap();renderLib();renderPanel();toast('已还原到上次保存的版本')}
+  else if(a==='save')save();
+  else if(a==='restoreDraft'){try{data=JSON.parse(S.draft);S.dirty=true;S.editing=true}catch(err){}S.draft=null;try{sessionStorage.removeItem('cscmap-draft')}catch(err){}renderTop();renderMap();renderLib();renderPanel();toast('已恢复。确认后按「保存」')}
+  else if(a==='dropDraft'){S.draft=null;try{sessionStorage.removeItem('cscmap-draft')}catch(err){}renderTop()}
+});
+function selectText(btn){var p=btn.parentNode.querySelector('p');if(!p)return;var r=document.createRange();r.selectNodeContents(p);var s=getSelection();s.removeAllRanges();s.addRange(r);toast('文字已选好，可以直接复制')}
+ROOT.addEventListener('mouseover',function(e){var c=e.target.closest&&e.target.closest('.chip');$$('.chip.twin-h').forEach(function(x){if(!c||x.dataset.node!==c.dataset.node)x.classList.remove('twin-h')});if(!c)return;$$('#board .chip[data-node="'+c.dataset.node+'"]').forEach(function(x){if(x!==c)x.classList.add('twin-h')})});
+ROOT.addEventListener('input',function(e){var el=e.target,f=el.dataset&&el.dataset.f;if(!f)return;var n=data.nodes[S.active];if(!n)return;var v=el.value;
+  var lines=function(x){return x.split('\n').map(function(s){return s.trim()}).filter(Boolean)};
+  if(f==='ask')n.ask=lines(v);
+  else if(f.indexOf('r.')===0){var r=n.responses[+el.dataset.i],k=f.slice(2);if(k==='ask')r.ask=lines(v);else if(k==='go'){if(v)r.go=v;else delete r.go}else r[k]=v}
+  else if(f==='icon'){if(v.trim())n.icon=v.trim();else delete n.icon;var pi=$('#panel .p-ic');if(pi)pi.textContent=icon(S.active)}
+  else n[f]=v;
+  dirty();renderMap();renderLib()});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&HOST.offsetParent!==null&&(S.active||S.mode==='add'||S.mode==='login'))closePanel()});
+ROOT.addEventListener('keydown',function(e){if(e.key==='Enter'&&e.target&&e.target.id==='cm-pw')login()});
+window.addEventListener('beforeunload',function(e){if(S.dirty){e.preventDefault();e.returnValue=''}});
+
+/* ---------- Firebase: load, admin login, save ---------- */
+var DOC_PATH='callMap/main';
+function fbErr(err){var c=err&&err.code;return c==='permission-denied'?'Firebase 不让存取 callMap（要在 Firestore Rules 加 callMap 的权限）':'连不上 Firebase，请检查网络后再试'}
+async function sha(text){var buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0')}).join('')}
+async function login(){var pw=$('#cm-pw'),er=$('#cm-lerr');if(!pw||!S.db)return;
+  try{var snap=await S.db.doc('meta/config').get();var h=snap.exists&&snap.data().adminPasswordHash;
+    if(h&&h===await sha(pw.value)){S.unlocked=true;try{sessionStorage.setItem('callmap_admin','1')}catch(e){}S.editing=true;S.mode='view';S.active=null;renderTop();renderMap();renderLib();renderPanel();toast('已进入编辑模式。点任何节点就可以改')}
+    else{er.hidden=false;er.textContent=h?'密码不对，请再试一次':'还没设定 Admin 密码，请先去 Performance Dashboard 设定'}}
+  catch(err){er.hidden=false;er.textContent=fbErr(err)}}
+var saving=false;
+function save(){if(saving)return;if(!S.db){toast('还没连上 Firebase，等一下再按');return}saving=true;toast('保存中…');
+  var payload=JSON.stringify(data);
+  S.db.doc(DOC_PATH).set({json:payload,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).then(function(){SAVED=JSON.parse(payload);S.dirty=false;saving=false;renderTop();toast('已保存 ✓ 全部 CSC 都会看到新内容')},function(err){saving=false;toast(fbErr(err))})}
+function applyRemote(json){try{var d=JSON.parse(json);SAVED=d;if(!S.dirty){data=clone(d);if(S.active&&!data.nodes[S.active]){S.active=null;S.mode='view'}renderMap();renderLib();if(S.mode!=='login')renderPanel()}else toast('有人刚更新了内容。你按「保存」会盖过去')}catch(e){}}
+function connect(){var tries=0;(function wait(){tries++;
+  var ok=window.firebase&&firebase.apps&&firebase.apps.some(function(a){return a.name==='[DEFAULT]'})&&firebase.auth&&firebase.auth().currentUser;
+  if(!ok){if(tries<120)return setTimeout(wait,500);S.offline='连不上 Firebase，现在显示的是内建内容（不能保存）。';renderTop();return}
+  S.db=firebase.firestore();S.offline=null;renderTop();
+  S.db.doc(DOC_PATH).onSnapshot(function(snap){if(snap.exists&&snap.data().json)applyRemote(snap.data().json)},function(err){S.offline=fbErr(err)+'。现在显示的是内建内容。';renderTop()})})()}
+
+/* ---------- boot ---------- */
+renderTop();renderMap();renderLib();
+if(HOST.offsetParent!==null)setTimeout(function(){S.intro=false},1800);
+var wasHidden=HOST.offsetParent===null;if(window.ResizeObserver)new ResizeObserver(function(){if(wasHidden&&HOST.offsetParent!==null){wasHidden=false;S.intro=true;renderMap();setTimeout(function(){S.intro=false},1800);return}drawWires()}).observe(HOST);
+window.addEventListener('resize',drawWires);
+connect();
+})();
+
 </script>
 <script>
 (function(){
