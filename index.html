@@ -715,6 +715,27 @@ html[data-theme="dark"] #app-followup{
   }
 #app-followup .toast-error{background:var(--danger);color:#fff;}
 #app-followup .mobile-day-scroll{overflow-x:auto;}
+#app-followup .qt-wrap{max-width:820px;}
+#app-followup .qt-table-wrap{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--surface);}
+#app-followup .qt-table{width:100%;border-collapse:collapse;font-size:13.5px;}
+#app-followup .qt-table th{text-align:left;padding:10px 16px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);background:var(--surface-2);border-bottom:1px solid var(--border);}
+#app-followup .qt-table td{padding:12px 16px;border-bottom:1px solid var(--border-soft);vertical-align:middle;}
+#app-followup .qt-table tr:last-child td{border-bottom:none;}
+#app-followup .qt-name{font-weight:600;font-family:"IBM Plex Mono",monospace;font-size:13px;word-break:break-all;}
+#app-followup .qt-status{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:3px 10px;border-radius:100px;white-space:nowrap;}
+#app-followup .qt-status .icon{width:14px;height:14px;}
+#app-followup .qt-status-img{background:var(--accent-soft);color:var(--accent-soft-ink);}
+#app-followup .qt-status-none{color:var(--ink-3);background:var(--surface-2);}
+#app-followup .qt-actions{display:flex;gap:6px;align-items:center;white-space:nowrap;}
+#app-followup .qt-modal-img-row{display:flex;gap:10px;align-items:center;margin-top:4px;}
+@media (max-width:640px){
+#app-followup .qt-table thead{display:none;}
+#app-followup .qt-table, #app-followup .qt-table tbody, #app-followup .qt-table tr, #app-followup .qt-table td{display:block;width:100%;}
+#app-followup .qt-table tr{padding:12px 16px;border-bottom:1px solid var(--border-soft);}
+#app-followup .qt-table td{padding:4px 0;border:none;}
+#app-followup .qt-name{font-size:14px;margin-bottom:2px;}
+#app-followup .qt-actions{margin-top:6px;}
+}
 @media (max-width: 880px){
 #app-followup .cat-shell{flex-direction:column;}
 #app-followup .sidebar{
@@ -4069,6 +4090,8 @@ boot();
   /* ============================= STATE ============================= */
   let state = loadLocalCache() || defaultData();
   if(!state.images) state.images = {}; // backward compat with older cached state
+  if(!state.quickTemplates) state.quickTemplates = []; // Follow Up Templates (name + image registry)
+  if(!state.quickTemplateImages) state.quickTemplateImages = {};
   let useDb = false;
   let db = null;
 
@@ -4150,6 +4173,23 @@ boot();
       saveLocalCache();
       render();
     }, function(err){ console.warn("images sync error", err); });
+
+    // Follow Up Templates (simple name + image registry) — its own
+    // collections, independent of the "templates"/"images" collections
+    // above so neither feature can ever touch the other's documents.
+    db.collection("quickTemplates").onSnapshot(function(snap){
+      state.quickTemplates = snap.docs.map(d => Object.assign({id:d.id}, d.data()));
+      saveLocalCache();
+      render();
+    }, function(err){ console.warn("quickTemplates sync error", err); });
+
+    db.collection("quickTemplateImages").onSnapshot(function(snap){
+      const map = {};
+      snap.docs.forEach(function(d){ map[d.id] = (d.data()||{}).dataUrl; });
+      state.quickTemplateImages = map;
+      saveLocalCache();
+      render();
+    }, function(err){ console.warn("quickTemplateImages sync error", err); });
   }
 
   // This exported copy is a plain static file (not served through Claude),
@@ -4339,6 +4379,64 @@ boot();
     saveLocalCache();
     return Promise.resolve();
   }
+
+  /* ---- Follow Up Templates (name + image registry) ---- */
+  function upsertQuickTemplateLocal(qt){
+    const i = state.quickTemplates.findIndex(x => x.id === qt.id);
+    if(i >= 0) state.quickTemplates[i] = qt; else state.quickTemplates.push(qt);
+    saveLocalCache();
+  }
+  function removeQuickTemplateLocal(id){
+    state.quickTemplates = state.quickTemplates.filter(x => x.id !== id);
+    saveLocalCache();
+  }
+  function saveQuickTemplate(qt){
+    if(useDb && db){
+      return db.collection("quickTemplates").doc(qt.id).set(qt).catch(function(e){
+        console.warn("quick template save failed", e);
+        showToast("Save failed — please try again", true);
+        throw e;
+      });
+    } else {
+      upsertQuickTemplateLocal(qt);
+      render();
+      return Promise.resolve();
+    }
+  }
+  function deleteQuickTemplateById(id){
+    if(useDb && db){
+      return db.collection("quickTemplates").doc(id).delete().catch(function(e){
+        console.warn("quick template delete failed", e);
+        showToast("Delete failed — please try again", true);
+        throw e;
+      });
+    } else {
+      removeQuickTemplateLocal(id);
+      render();
+      return Promise.resolve();
+    }
+  }
+  function persistQuickTemplateImage(id, dataUrl){
+    if(useDb && db){
+      return db.collection("quickTemplateImages").doc(id).set({ dataUrl: dataUrl }).catch(function(e){
+        console.warn("quick template image save failed", e);
+        showToast("Couldn't save that image — please try again", true);
+      });
+    }
+    state.quickTemplateImages[id] = dataUrl;
+    saveLocalCache();
+    return Promise.resolve();
+  }
+  function persistQuickTemplateImageDelete(id){
+    if(!id) return Promise.resolve();
+    if(useDb && db){
+      return db.collection("quickTemplateImages").doc(id).delete().catch(function(e){ console.warn("quick template image delete failed", e); });
+    }
+    delete state.quickTemplateImages[id];
+    saveLocalCache();
+    return Promise.resolve();
+  }
+
   function sendStepLabel(type, occurrenceIndex){
     if(type === "image"){
       return occurrenceIndex === 0 ? "Image" : (occurrenceIndex===1?"Second Image":(occurrenceIndex===2?"Third Image":("Image "+(occurrenceIndex+1))));
@@ -4430,6 +4528,7 @@ boot();
         '<div id="searchResultsSlot"></div>' +
       '</div>' +
       '<div class="header-right">' +
+        '<button class="btn btn-sm" data-action="go-quicktpl" title="Manage Follow Up Templates">'+ICONS.image+'<span> Templates</span></button>' +
         '<div class="sync-badge"><span class="sync-dot '+(useDb?'':'local')+'"></span>'+(useDb ? 'Synced to team' : 'Local only')+'</div>' +
         '<div class="mode-toggle">' +
           '<button data-action="set-mode" data-mode="csc" class="'+(mode==='csc'?'active':'')+'">'+ICONS.userIcon+'<span>CSC Mode</span></button>' +
@@ -4505,6 +4604,55 @@ boot();
           '</button>';
         }).join("") +
       '</div>' +
+    '</div>';
+  }
+
+  /* ============================= RENDER: FOLLOW UP TEMPLATES ============================= */
+  // Simple flat registry — Template Name + optional Image — kept fully
+  // separate from the category/day "templates" system above (own
+  // collections, own ids, own state keys) so the two never collide.
+  function renderQuickTemplatesView(){
+    const list = (state.quickTemplates||[]).slice().sort(function(a,b){
+      return (a.order||0) - (b.order||0) || String(a.name||"").localeCompare(String(b.name||""));
+    });
+    let bodyHtml;
+    if(list.length === 0){
+      bodyHtml = '<div class="empty-state">' + ICONS.inbox +
+        '<h3>No templates yet</h3><p>Keep a simple list of every Follow Up template name here, with a note on whether it has an image ready to send.</p>' +
+        (mode==='admin' ? '<button class="btn btn-primary" data-action="add-quicktpl">'+ICONS.plus+' Add Template</button>' : '<p style="color:var(--ink-3)">Switch to Admin Mode to add templates.</p>') +
+      '</div>';
+    } else {
+      bodyHtml = '<div class="qt-table-wrap"><table class="qt-table">' +
+        '<thead><tr><th>Template Name</th><th>Image Status</th><th>Action</th></tr></thead>' +
+        '<tbody>' +
+        list.map(function(qt){
+          const dataUrl = qt.imageId ? state.quickTemplateImages[qt.imageId] : null;
+          const hasImg = !!dataUrl;
+          return '<tr>' +
+            '<td class="qt-name">'+esc(qt.name)+'</td>' +
+            '<td>'+(hasImg ?
+              '<span class="qt-status qt-status-img">'+ICONS.image+'<span>With Image</span></span>' :
+              '<span class="qt-status qt-status-none">No Image</span>') +
+            '</td>' +
+            '<td class="qt-actions">' +
+              (hasImg ? '<button class="btn btn-sm" data-action="view-quicktpl-image" data-id="'+esc(qt.id)+'">View</button>' : '') +
+              (mode==='admin' ? '<button class="icon-btn" data-action="edit-quicktpl" data-id="'+esc(qt.id)+'" title="Edit">'+ICONS.pencil+'</button>' : '') +
+              (mode==='admin' ? '<button class="icon-btn danger" data-action="delete-quicktpl" data-id="'+esc(qt.id)+'" title="Delete">'+ICONS.trash+'</button>' : '') +
+            '</td>' +
+          '</tr>';
+        }).join("") +
+        '</tbody></table></div>' +
+        (mode==='admin' ? '<button class="btn btn-sm admin-add-row" data-action="add-quicktpl">'+ICONS.plus+' Add Template</button>' : '');
+    }
+
+    return '<div class="qt-wrap">' +
+      '<div class="cat-header">' +
+        '<div class="breadcrumb"><button data-action="go-home">Home</button> / Follow Up Templates</div>' +
+        '<div class="cat-header-top"><div><h1>Follow Up Templates</h1>' +
+          '<div class="cat-sub">A simple list of every template name, and whether it has an image ready to send.</div>' +
+        '</div></div>' +
+      '</div>' +
+      bodyHtml +
     '</div>';
   }
 
@@ -4838,6 +4986,30 @@ boot();
     '</div>';
   }
 
+  function quickTemplateModalHtml(){
+    const isAdd = modal.mode === "add";
+    const draft = modal.draft;
+    const dataUrl = draft.imageId ? state.quickTemplateImages[draft.imageId] : null;
+    return '<div class="overlay" data-action="close-modal-bg">' +
+      '<div class="modal confirm-modal" data-stop="1">' +
+        '<div class="modal-head"><h2>'+(isAdd?'Add Template':'Edit Template')+'</h2>' +
+          '<button class="icon-btn" data-action="close-modal">'+ICONS.x+'</button></div>' +
+        '<div class="field"><label>Template Name</label><input type="text" id="qtNameInput" value="'+esc(draft.name)+'" placeholder="e.g. pigment_got_try_template"></div>' +
+        '<div class="field"><label>Image <span class="hint">(optional)</span></label>' +
+          '<div class="qt-modal-img-row">' +
+            (dataUrl ? '<div class="img-thumb" data-imgid="'+esc(draft.imageId)+'"><img src="'+dataUrl+'"><button class="rm-btn" data-action="quicktpl-remove-image" title="Remove image">'+ICONS.x+'</button></div>' : '') +
+          '</div>' +
+          '<input type="file" id="qtImgInput" accept="image/*" style="margin-top:8px;">' +
+          '<div class="hint" style="margin-top:6px;font-size:11.5px;color:var(--ink-3);">'+(dataUrl ? 'Choosing a new file replaces this image.' : 'Some templates don’t need an image — this is optional.')+'</div>' +
+        '</div>' +
+        '<div class="modal-actions">' +
+          '<button class="btn" data-action="close-modal">Cancel</button>' +
+          '<button class="btn btn-primary" data-action="save-quicktpl">'+ICONS.check+' '+(isAdd?'Add':'Save')+'</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
   function lightboxHtml(){
     const imgs = lightbox.images;
     const cur = imgs[lightbox.index];
@@ -4905,13 +5077,15 @@ boot();
       viewHtml = renderHome();
     } else if(view === "category"){
       viewHtml = '<div class="cat-shell">' + renderSidebar() + renderCategoryMain(currentCategoryId) + '</div>';
+    } else if(view === "quicktpl"){
+      viewHtml = renderQuickTemplatesView();
     }
 
     appEl.innerHTML =
       '<header class="app-header" id="appHeader"></header>' +
       (mode==='admin' ? '<div class="admin-banner">'+ICONS.shield+'<span>Admin Mode — changes '+(useDb?'sync to the whole team':'are saved to this browser only')+'. Switch back to CSC Mode when you\'re done editing.</span></div>' : '') +
       '<div class="view">' + viewHtml + '</div>' +
-      (modal ? (modal.type==='template' ? templateModalHtml() : modal.type==='rename-day' ? renameDayModalHtml() : modal.type==='category' ? categoryModalHtml() : modal.type==='admin-password' ? adminPasswordModalHtml() : confirmModalHtml()) : '') +
+      (modal ? (modal.type==='template' ? templateModalHtml() : modal.type==='rename-day' ? renameDayModalHtml() : modal.type==='category' ? categoryModalHtml() : modal.type==='admin-password' ? adminPasswordModalHtml() : modal.type==='quicktpl' ? quickTemplateModalHtml() : confirmModalHtml()) : '') +
       (lightbox ? lightboxHtml() : '');
 
     renderHeader();
@@ -4928,6 +5102,31 @@ boot();
             e.preventDefault();
             document.querySelector('[data-action="submit-admin-password"]').click();
           }
+        });
+      }
+      return;
+    }
+    if(modal && modal.type === "quicktpl"){
+      const nameInput = document.getElementById("qtNameInput");
+      if(nameInput) nameInput.focus();
+      const qImg = document.getElementById("qtImgInput");
+      if(qImg){
+        qImg.addEventListener("change", function(e){
+          const file = (e.target.files || [])[0];
+          if(!file) return;
+          // Keep whatever name is typed so far — the async compression
+          // below re-renders the modal before the admin clicks Save.
+          const nameEl = document.getElementById("qtNameInput");
+          if(nameEl) modal.draft.name = nameEl.value;
+          const oldImageId = modal.draft.imageId;
+          readAndCompressImage(file).then(function(r){
+            persistQuickTemplateImage(r.id, r.dataUrl);
+            modal.draft.imageId = r.id;
+            if(oldImageId) persistQuickTemplateImageDelete(oldImageId);
+            render();
+          }).catch(function(){
+            showToast("Couldn't read that image — please try a different file", true);
+          });
         });
       }
       return;
@@ -4975,6 +5174,11 @@ boot();
     switch(action){
       case "go-home":
         view = "home"; currentCategoryId = null; currentDay = null; purposeFilter = null;
+        searchOpen = false; render(); window.scrollTo(0,0);
+        break;
+
+      case "go-quicktpl":
+        view = "quicktpl"; currentCategoryId = null; currentDay = null; purposeFilter = null;
         searchOpen = false; render(); window.scrollTo(0,0);
         break;
 
@@ -5200,6 +5404,54 @@ boot();
           },
           "Delete Category"
         );
+        break;
+      }
+
+      /* ---- admin: Follow Up Templates (name + image registry) ---- */
+      case "add-quicktpl": {
+        modal = { type:"quicktpl", mode:"add", draft: { id: uid("qtpl"), name:"", imageId:null, order: (Math.max(0,...state.quickTemplates.map(x=>x.order||0))+1) } };
+        render();
+        break;
+      }
+      case "edit-quicktpl": {
+        const qt = state.quickTemplates.find(x=>x.id===t.dataset.id);
+        if(qt) modal = { type:"quicktpl", mode:"edit", draft: Object.assign({}, qt) };
+        render();
+        break;
+      }
+      case "save-quicktpl": {
+        const nameInput = document.getElementById("qtNameInput");
+        const name = nameInput ? nameInput.value.trim() : "";
+        if(!name){ nameInput && nameInput.focus(); break; }
+        const draft = Object.assign({}, modal.draft, { name: name });
+        saveQuickTemplate(draft).then(function(){ modal = null; render(); }).catch(function(){});
+        break;
+      }
+      case "delete-quicktpl": {
+        const qid = t.dataset.id;
+        const qt = state.quickTemplates.find(x=>x.id===qid);
+        openConfirm(
+          "Delete "+(qt?('"'+qt.name+'"'):"this template")+"?",
+          "This template"+(qt && qt.imageId ? " and its image" : "")+" will be removed for everyone. This can't be undone.",
+          function(){
+            if(qt && qt.imageId) persistQuickTemplateImageDelete(qt.imageId);
+            deleteQuickTemplateById(qid).catch(function(){});
+          },
+          "Delete Template"
+        );
+        break;
+      }
+      case "quicktpl-remove-image": {
+        const oldId = modal.draft.imageId;
+        if(oldId){ persistQuickTemplateImageDelete(oldId); }
+        modal.draft.imageId = null;
+        render();
+        break;
+      }
+      case "view-quicktpl-image": {
+        const qt = state.quickTemplates.find(x=>x.id===t.dataset.id);
+        const dataUrl = qt && qt.imageId ? state.quickTemplateImages[qt.imageId] : null;
+        if(dataUrl){ lightbox = { images: [{ id: qt.imageId, dataUrl: dataUrl }], index: 0 }; render(); }
         break;
       }
 
