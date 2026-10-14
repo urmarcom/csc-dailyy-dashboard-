@@ -800,6 +800,7 @@ html[data-theme="dark"] #app-followup{
 <div class="hub-switcher" id="hub-switcher">
   <button type="button" class="hub-switch-btn active" data-hub-switch="dashboard">📊 Performance Dashboard</button>
   <button type="button" class="hub-switch-btn" data-hub-switch="followup">💬 Follow Up Hub</button>
+  <button type="button" class="hub-switch-btn" data-hub-switch="testimonial">🖼️ Testimonial</button>
   <button type="button" class="hub-switch-btn" data-hub-switch="callmap">🧭 会问会答 Map</button>
   <button type="button" class="hub-switch-btn" data-hub-switch="whiteboard">🗒️ Whiteboard</button>
   <button type="button" class="hub-switch-btn" data-hub-switch="meeting">📋 Meeting Minutes</button>
@@ -810,6 +811,9 @@ html[data-theme="dark"] #app-followup{
 </div>
 <div class="hub-pane" id="hub-pane-followup">
 <div id="app-followup"></div>
+</div>
+<div class="hub-pane" id="hub-pane-testimonial">
+<div id="app-testimonial"></div>
 </div>
 <div class="hub-pane" id="hub-pane-callmap">
 <div id="app-callmap"></div>
@@ -5654,6 +5658,697 @@ boot();
       if(e.key==="ArrowRight"){ lightbox.index=(lightbox.index+1)%lightbox.images.length; render(); }
       if(e.key==="ArrowLeft"){ lightbox.index=(lightbox.index-1+lightbox.images.length)%lightbox.images.length; render(); }
     }
+  });
+
+  /* ============================= INIT ============================= */
+  render();
+})();
+</script>
+<!-- ============================================================
+     TESTIMONIAL PHOTO LIBRARY — its own hub pane (#app-testimonial),
+     completely separate from the Follow Up Hub above: own CSS (scoped
+     under #app-testimonial so nothing here can leak into any other hub),
+     own IIFE/state, own click dispatcher (data-tst-action / data-tst-mode,
+     never data-action, so it can never collide with Follow Up Hub's own
+     dispatcher). It reuses the SAME "followup" named Firebase app/project
+     as the Follow Up Hub just above (same FIREBASE_CONFIG_FOLLOWUP, same
+     ADMIN_PASSWORD / "csc_admin_unlocked" session key so unlocking Admin
+     Mode once carries over), but its own Firestore collections
+     (testimonialPhotos / testimonialThumbs) so neither feature can ever
+     touch the other's documents, and its own Storage folder
+     (testimonials/<photoId>/...) for the untouched HD originals.
+     ============================================================ -->
+<style>
+#app-testimonial{
+    --bg:#F3F5F3; --surface:#FFFFFF; --surface-2:#EBF1EE; --border:#DCE4DE; --border-soft:#E6ECE8;
+    --ink:#172321; --ink-2:#55635E; --ink-3:#89948E;
+    --accent:#1F5C52; --accent-2:#163F39; --accent-soft:#DCEEE9; --accent-soft-ink:#12433C;
+    --danger:#B3413A; --danger-bg:#FBEAE8; --danger-border:#F0CBC7;
+    --success:#2E7D4F;
+    --shadow-sm:0 1px 2px rgba(23,35,33,0.06); --shadow-md:0 6px 20px rgba(23,35,33,0.08); --shadow-lg:0 20px 60px rgba(23,35,33,0.18);
+    --radius:14px; --radius-sm:9px;
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    font-size:14.5px;line-height:1.55;min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+@media (prefers-color-scheme: dark){
+html:not([data-theme="light"]) #app-testimonial{
+    --bg:#12201C; --surface:#182A25; --surface-2:#1E342D; --border:#2B453C; --border-soft:#24392F;
+    --ink:#E7F1EC; --ink-2:#A9BDB4; --ink-3:#6F8880;
+    --accent:#5AC9B2; --accent-2:#3FA68F; --accent-soft:#1F3E36; --accent-soft-ink:#8FDFCB;
+    --danger:#E6897E; --danger-bg:#3A211E; --danger-border:#5C332C;
+    --success:#6FCB91;
+  }}
+html[data-theme="dark"] #app-testimonial{
+    --bg:#12201C; --surface:#182A25; --surface-2:#1E342D; --border:#2B453C; --border-soft:#24392F;
+    --ink:#E7F1EC; --ink-2:#A9BDB4; --ink-3:#6F8880;
+    --accent:#5AC9B2; --accent-2:#3FA68F; --accent-soft:#1F3E36; --accent-soft-ink:#8FDFCB;
+    --danger:#E6897E; --danger-bg:#3A211E; --danger-border:#5C332C;
+    --success:#6FCB91;
+  }
+#app-testimonial h1, #app-testimonial h2, #app-testimonial h3{
+    font-family:"Fraunces",Georgia,"Times New Roman",serif; font-weight:600; letter-spacing:-0.01em; color:var(--ink); margin:0;
+  }
+#app-testimonial button{font-family:inherit;}
+#app-testimonial .icon{width:16px;height:16px;flex:none;display:block;}
+#app-testimonial svg{overflow:visible;}
+#app-testimonial .app-header{
+    position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:18px;padding:13px 24px;
+    background:color-mix(in srgb, var(--surface) 92%, transparent);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border-soft);
+  }
+#app-testimonial .brand{display:flex;align-items:center;gap:9px;flex:none;}
+#app-testimonial .brand-mark{
+    width:30px;height:30px;border-radius:9px;background:var(--accent);color:var(--surface);
+    display:flex;align-items:center;justify-content:center;font-size:16px;flex:none;
+  }
+#app-testimonial .brand-name{font-family:"Fraunces",serif;font-weight:600;font-size:16px;white-space:nowrap;}
+#app-testimonial .header-right{display:flex;align-items:center;gap:12px;margin-left:auto;flex:none;flex-wrap:wrap;}
+#app-testimonial .sync-badge{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-3);white-space:nowrap;}
+#app-testimonial .sync-dot{width:7px;height:7px;border-radius:50%;background:var(--success);flex:none;}
+#app-testimonial .sync-dot.local{background:var(--ink-3);}
+#app-testimonial .mode-toggle{display:flex;padding:3px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);flex:none;}
+#app-testimonial .mode-toggle button{
+    border:none;background:none;padding:6px 13px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--ink-2);
+    cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;
+  }
+#app-testimonial .mode-toggle button.active{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-sm);}
+#app-testimonial .mode-toggle button.active.admin-active{background:var(--accent);color:var(--surface);}
+#app-testimonial .admin-banner{
+    background:var(--accent-soft);color:var(--accent-soft-ink);font-size:12.5px;padding:8px 24px;
+    display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border-soft);
+  }
+#app-testimonial .tst-wrap{max-width:1180px;margin:0 auto;padding:28px 24px 90px;}
+#app-testimonial .tst-head p{color:var(--ink-2);font-size:13.5px;margin:4px 0 0;}
+#app-testimonial .tst-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:18px 0;flex-wrap:wrap;}
+#app-testimonial .tst-filter-row{display:flex;flex-wrap:wrap;gap:8px;}
+#app-testimonial .tst-filter-chip{
+    border:1px solid var(--border);background:var(--surface);color:var(--ink-2);border-radius:999px;
+    padding:7px 14px;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;
+  }
+#app-testimonial .tst-filter-chip .cnt{background:var(--surface-2);color:var(--ink-3);border-radius:999px;padding:1px 7px;font-size:11px;}
+#app-testimonial .tst-filter-chip.active{background:var(--accent);border-color:var(--accent);color:var(--surface);}
+#app-testimonial .tst-filter-chip.active .cnt{background:rgba(255,255,255,.25);color:var(--surface);}
+#app-testimonial .tst-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;margin-top:20px;}
+#app-testimonial .tst-card{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;
+    display:flex;flex-direction:column;box-shadow:var(--shadow-sm);
+  }
+#app-testimonial .tst-card-img{width:100%;aspect-ratio:1/1;object-fit:cover;background:var(--surface-2);cursor:zoom-in;display:block;}
+#app-testimonial .tst-card-body{padding:12px 14px 14px;display:flex;flex-direction:column;gap:8px;flex:1;}
+#app-testimonial .tst-cat-tag{
+    display:inline-flex;align-items:center;width:fit-content;padding:3px 10px;border-radius:100px;
+    background:var(--accent-soft);color:var(--accent-soft-ink);font-size:11px;font-weight:700;letter-spacing:.02em;
+  }
+#app-testimonial .tst-card-caption{font-size:13px;color:var(--ink-2);line-height:1.45;}
+#app-testimonial .tst-card-actions{display:flex;gap:6px;margin-top:auto;padding-top:6px;flex-wrap:wrap;}
+#app-testimonial .tst-download-btn{flex:1;justify-content:center;}
+#app-testimonial .tst-icon-btn{
+    width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--ink-2);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;
+  }
+#app-testimonial .tst-icon-btn:hover{background:var(--surface-2);}
+#app-testimonial .tst-icon-btn.danger:hover{background:var(--danger-bg);color:var(--danger);border-color:var(--danger-border);}
+#app-testimonial .empty-state{text-align:center;padding:70px 20px;color:var(--ink-3);}
+#app-testimonial .empty-state h3{font-size:16px;margin-bottom:6px;color:var(--ink-2);}
+#app-testimonial .btn{
+    display:inline-flex;align-items:center;gap:7px;padding:8px 15px;border-radius:9px;font-size:13px;font-weight:600;
+    cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--ink);white-space:nowrap;
+  }
+#app-testimonial .btn:hover{background:var(--surface-2);}
+#app-testimonial .btn-primary{background:var(--accent);border-color:var(--accent);color:var(--surface);}
+#app-testimonial .btn-primary:hover{background:var(--accent-2);border-color:var(--accent-2);}
+#app-testimonial .btn-danger{background:var(--danger-bg);border-color:var(--danger-border);color:var(--danger);}
+#app-testimonial .btn-danger:hover{background:var(--danger-border);}
+#app-testimonial .btn-sm{padding:6px 12px;font-size:12px;}
+#app-testimonial .btn[disabled]{opacity:.55;cursor:not-allowed;}
+#app-testimonial .overlay{
+    position:fixed;inset:0;background:rgba(15,20,18,0.5);display:flex;align-items:flex-start;justify-content:center;
+    z-index:100;padding:5vh 20px;overflow-y:auto;
+  }
+#app-testimonial .modal{
+    background:var(--surface);border-radius:16px;box-shadow:var(--shadow-lg);width:100%;max-width:580px;
+    padding:26px 26px 22px;margin-bottom:5vh;
+  }
+#app-testimonial .modal h2{font-size:19px;margin-bottom:4px;}
+#app-testimonial .modal .modal-sub{color:var(--ink-2);font-size:12.5px;margin-bottom:18px;}
+#app-testimonial .field{margin-bottom:16px;}
+#app-testimonial .field label{display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:6px;}
+#app-testimonial .field label .hint{font-weight:400;color:var(--ink-3);}
+#app-testimonial .field input[type=text], #app-testimonial .field input[type=password], #app-testimonial .field textarea, #app-testimonial .field select{
+    width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);
+    color:var(--ink);font-size:13.5px;font-family:inherit;outline:none;
+  }
+#app-testimonial .field input:focus, #app-testimonial .field textarea:focus, #app-testimonial .field select:focus{border-color:var(--accent);}
+#app-testimonial .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:22px;}
+#app-testimonial .modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+#app-testimonial .confirm-modal{max-width:400px;}
+#app-testimonial .confirm-modal p{font-size:13.5px;color:var(--ink-2);margin:0 0 20px;line-height:1.55;}
+#app-testimonial .tst-pending-grid{display:flex;flex-direction:column;gap:10px;margin-top:10px;max-height:280px;overflow-y:auto;}
+#app-testimonial .tst-pending-item{
+    display:flex;gap:10px;align-items:flex-start;border:1px solid var(--border-soft);border-radius:10px;padding:8px;background:var(--surface-2);
+  }
+#app-testimonial .tst-pending-thumb{width:56px;height:56px;border-radius:7px;object-fit:cover;flex:none;background:var(--border-soft);}
+#app-testimonial .tst-pending-item input[type=text]{
+    width:100%;padding:6px 9px;border-radius:7px;border:1px solid var(--border);background:var(--surface);font-size:12.5px;outline:none;
+  }
+#app-testimonial .tst-pending-item input:focus{border-color:var(--accent);}
+#app-testimonial .tst-upload-progress{font-size:12.5px;color:var(--ink-2);margin-top:10px;}
+#app-testimonial .lightbox-overlay{
+    position:fixed;inset:0;background:rgba(10,14,13,0.85);z-index:110;display:flex;align-items:center;justify-content:center;padding:5vh 24px;
+  }
+#app-testimonial .lightbox-overlay img{max-width:100%;max-height:74vh;border-radius:8px;box-shadow:var(--shadow-lg);}
+#app-testimonial .lightbox-card{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:90vw;}
+#app-testimonial .lightbox-meta{color:#fff;text-align:center;font-size:13px;display:flex;flex-direction:column;gap:8px;align-items:center;}
+#app-testimonial .lightbox-close{
+    position:absolute;top:24px;right:28px;width:38px;height:38px;border-radius:100px;background:rgba(255,255,255,.12);
+    border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;
+  }
+#app-testimonial .toast{
+    position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);
+    padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:120;box-shadow:var(--shadow-lg);
+    display:flex;align-items:center;gap:8px;max-width:min(90vw,420px);
+  }
+#app-testimonial .toast-error{background:var(--danger);color:#fff;}
+@media (max-width:880px){
+  #app-testimonial .app-header{flex-wrap:wrap;padding:12px 16px;}
+  #app-testimonial .tst-wrap{padding:20px 14px 70px;}
+  #app-testimonial .tst-grid{grid-template-columns:repeat(2,1fr);gap:12px;}
+  #app-testimonial .modal{padding:20px 18px 18px;}
+}
+@media (max-width:480px){
+  #app-testimonial .tst-grid{grid-template-columns:1fr 1fr;}
+}
+</style>
+<script>
+(function(){
+  "use strict";
+
+  const ICONS = {
+    x:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>',
+    plus:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+    pencil:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l.9-3.9L16.6 4.4a1.8 1.8 0 0 1 2.5 0l1 1a1.8 1.8 0 0 1 0 2.5L8.4 19.6z"/><path d="M14.5 6.5l3.5 3.5"/></svg>',
+    trash:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15M9.5 7V5a1.5 1.5 0 0 1 1.5-1.5h2A1.5 1.5 0 0 1 14.5 5v2M18 7l-.8 12a2 2 0 0 1-2 1.9H8.8a2 2 0 0 1-2-1.9L6 7"/></svg>',
+    shield:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l7 2.6v5.4c0 4.6-3 8.1-7 9-4-.9-7-4.4-7-9V6.1z"/></svg>',
+    userIcon:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.3" r="3.3"/><path d="M5 19.5c1.3-3.3 4-5 7-5s5.7 1.7 7 5"/></svg>',
+    download:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><polyline points="7.5 11 12 15.5 16.5 11"/><path d="M4.5 17.5v2A1.8 1.8 0 0 0 6.3 21.3h11.4A1.8 1.8 0 0 0 19.5 19.5v-2"/></svg>',
+  };
+
+  const TESTIMONIAL_CATEGORIES = [
+    { id:"melasma", name:"Melasma" },
+    { id:"freckles", name:"Freckles" },
+    { id:"age-spot", name:"Age Spot" },
+    { id:"abnom", name:"ABNOM" },
+    { id:"uneven-skin-tone", name:"Uneven Skin Tone" },
+    { id:"acne", name:"Acne" },
+  ];
+
+  function esc(s){
+    return String(s==null?"":s).replace(/[&<>"']/g, function(c){
+      return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c];
+    });
+  }
+  function uid(){ return "tst_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,8); }
+
+  function loadLocalCache(){
+    try{
+      const raw = localStorage.getItem("csc_testimonial_cache_v1");
+      if(!raw) return null;
+      const parsed = JSON.parse(raw);
+      if(parsed && Array.isArray(parsed.photos)) return parsed;
+    }catch(e){}
+    return null;
+  }
+  function saveLocalCache(){
+    try{ localStorage.setItem("csc_testimonial_cache_v1", JSON.stringify(state)); }catch(e){}
+  }
+
+  /* ============================= STATE ============================= */
+  let state = loadLocalCache() || { photos: [], thumbs: {} };
+  let db = null, storage = null, useDb = false;
+  const ADMIN_PASSWORD = "agh030222";
+  let mode = "csc";
+  let adminUnlocked = false;
+  try{ adminUnlocked = sessionStorage.getItem("csc_admin_unlocked") === "1"; }catch(e){}
+  let filter = "all";
+  let modal = null;
+  let lightbox = null;
+  let toastMsg = null, toastIsError = false, toastTimer = null;
+
+  function showToast(msg, isError){
+    toastMsg = msg; toastIsError = !!isError;
+    render();
+    if(toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ toastMsg = null; render(); }, 3200);
+  }
+
+  function testimonialCategoryName(id){
+    const c = TESTIMONIAL_CATEGORIES.find(function(x){ return x.id === id; });
+    return c ? c.name : id;
+  }
+  function filteredList(){
+    const list = (state.photos||[]).slice().sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
+    if(filter === "all") return list;
+    return list.filter(function(p){ return p.category === filter; });
+  }
+
+  /* ============================= DB WIRING ============================= */
+  function initDb(){
+    db.collection("testimonialPhotos").onSnapshot(function(snap){
+      state.photos = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+      saveLocalCache();
+      render();
+    }, function(err){ console.warn("testimonialPhotos sync error", err); });
+
+    db.collection("testimonialThumbs").onSnapshot(function(snap){
+      const map = {};
+      snap.docs.forEach(function(d){ map[d.id] = (d.data()||{}).dataUrl; });
+      state.thumbs = map;
+      saveLocalCache();
+      render();
+    }, function(err){ console.warn("testimonialThumbs sync error", err); });
+  }
+
+  try{
+    if(typeof firebase !== "undefined" && typeof FIREBASE_CONFIG_FOLLOWUP !== "undefined"){
+      // Reuses the SAME named ("followup") Firebase app as the Follow Up
+      // Hub above — same Firestore project, so no new Firebase project or
+      // password is needed, just (if not done already) turning on Storage
+      // for the "csc-follow-up" project in the Firebase console.
+      const fuApp = firebase.apps.some(function(a){ return a.name === "followup"; })
+        ? firebase.app("followup")
+        : firebase.initializeApp(FIREBASE_CONFIG_FOLLOWUP, "followup");
+      db = fuApp.firestore();
+      useDb = true;
+      try{ storage = fuApp.storage(); }catch(e){
+        storage = null;
+        console.warn("Testimonial Photos: Firebase Storage isn't available yet (the csc-follow-up project may still need the Blaze plan/Storage turned on)", e);
+      }
+      initDb();
+    }
+  }catch(e){
+    console.warn("Testimonial Photos: Firebase unavailable, staying in local-only mode", e);
+  }
+
+  /* ============================= HD UPLOAD / DOWNLOAD ============================= */
+  function makeThumbnail(file){
+    return new Promise(function(resolve, reject){
+      const reader = new FileReader();
+      reader.onerror = function(){ reject(new Error("Could not read the image file")); };
+      reader.onload = function(){
+        const img = new Image();
+        img.onerror = function(){ reject(new Error("Could not decode the image")); };
+        img.onload = function(){
+          const maxDim = 480;
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const cw = Math.max(1, Math.round(img.width*scale)), ch = Math.max(1, Math.round(img.height*scale));
+          const canvas = document.createElement("canvas");
+          canvas.width = cw; canvas.height = ch;
+          canvas.getContext("2d").drawImage(img, 0, 0, cw, ch);
+          resolve(canvas.toDataURL("image/jpeg", 0.72));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  function uploadHDOriginal(file, id){
+    const path = "testimonials/" + id + "/" + file.name.replace(/[^a-zA-Z0-9_.\-]/g, "_");
+    const ref = storage.ref().child(path);
+    return ref.put(file, { contentType: file.type || "application/octet-stream" })
+      .then(function(snap){ return snap.ref.getDownloadURL(); })
+      .then(function(url){ return { path: path, url: url }; });
+  }
+  async function saveTestimonialPhoto(opts){
+    if(!useDb || !db || !storage) throw new Error("Photo storage isn't connected right now — please reload the page and try again.");
+    const id = uid();
+    const thumbDataUrl = await makeThumbnail(opts.file);
+    const hd = await uploadHDOriginal(opts.file, id);
+    await db.collection("testimonialPhotos").doc(id).set({
+      category: opts.category,
+      caption: opts.caption || "",
+      fileName: opts.file.name,
+      fileType: opts.file.type || "",
+      fileSize: opts.file.size || 0,
+      hdPath: hd.path,
+      hdUrl: hd.url,
+      createdAt: Date.now(),
+    });
+    await db.collection("testimonialThumbs").doc(id).set({ dataUrl: thumbDataUrl });
+    return id;
+  }
+  async function deleteTestimonialPhoto(photo){
+    try{ if(photo.hdPath) await storage.ref().child(photo.hdPath).delete(); }catch(e){ /* best effort — e.g. already gone */ }
+    try{ await db.collection("testimonialThumbs").doc(photo.id).delete(); }catch(e){}
+    await db.collection("testimonialPhotos").doc(photo.id).delete();
+  }
+  async function updateTestimonialPhoto(id, patch){
+    await db.collection("testimonialPhotos").doc(id).set(patch, { merge: true });
+  }
+  function downloadTestimonialHD(photo){
+    if(!photo || !photo.hdUrl){ showToast("This photo's HD file isn't available — check the Firebase Storage setup", true); return; }
+    showToast("Preparing HD download…");
+    fetch(photo.hdUrl).then(function(r){
+      if(!r.ok) throw new Error("Download failed (" + r.status + ")");
+      return r.blob();
+    }).then(function(blob){
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = photo.fileName || "testimonial-photo";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+      showToast("Downloaded in full HD quality");
+    }).catch(function(e){
+      console.warn("HD download failed", e);
+      showToast("Download failed: " + (e && e.message ? e.message : "please check your connection and try again"), true);
+    });
+  }
+
+  /* ============================= RENDER ============================= */
+  function adminBannerHtml(){
+    return mode === "admin"
+      ? '<div class="admin-banner">'+ICONS.shield+"<span>Admin Mode — uploads, edits and deletes sync to the whole team. Switch back to CSC Mode when you're done.</span></div>"
+      : "";
+  }
+  function headerHtml(){
+    return '<div class="app-header">' +
+      '<div class="brand"><div class="brand-mark">🖼️</div><div class="brand-name">Testimonial Photos</div></div>' +
+      '<div class="header-right">' +
+        '<div class="sync-badge"><span class="sync-dot'+(useDb?"":" local")+'"></span>'+(useDb?"Synced to team":"Local only")+"</div>" +
+        '<div class="mode-toggle">' +
+          '<button data-tst-mode="csc" class="'+(mode==="csc"?"active":"")+'">'+ICONS.userIcon+"<span>CSC Mode</span></button>" +
+          '<button data-tst-mode="admin" class="'+(mode==="admin"?"active admin-active":"")+'">'+ICONS.shield+"<span>Admin Mode</span></button>" +
+        "</div>" +
+      "</div>" +
+    "</div>";
+  }
+  function toolbarHtml(){
+    const chips = [{id:"all", name:"All Photos"}].concat(TESTIMONIAL_CATEGORIES);
+    return '<div class="tst-toolbar"><div class="tst-filter-row">' + chips.map(function(c){
+      const n = c.id==="all" ? (state.photos||[]).length : (state.photos||[]).filter(function(p){ return p.category===c.id; }).length;
+      return '<button class="tst-filter-chip'+(filter===c.id?" active":"")+'" data-tst-action="set-filter" data-filter="'+c.id+'">'+esc(c.name)+' <span class="cnt">'+n+"</span></button>";
+    }).join("") + "</div>" +
+      (mode==="admin" ? '<button class="btn btn-primary" data-tst-action="open-upload">'+ICONS.plus+" Add Photos</button>" : "") +
+    "</div>";
+  }
+  function gridHtml(){
+    const list = filteredList();
+    if(!list.length){
+      return '<div class="empty-state"><h3>No photos yet'+(filter==="all"?"":" in "+esc(testimonialCategoryName(filter)))+"</h3><p>" +
+        (mode==="admin" ? 'Click "Add Photos" above to upload the first one.' : "Check back later, or ask an Admin to upload some.") +
+        "</p></div>";
+    }
+    return '<div class="tst-grid">' + list.map(function(p){
+      const thumb = state.thumbs[p.id] || "";
+      return '<div class="tst-card">' +
+        (thumb ? '<img class="tst-card-img" src="'+esc(thumb)+'" data-tst-action="view-photo" data-id="'+esc(p.id)+'" />' : '<div class="tst-card-img" data-tst-action="view-photo" data-id="'+esc(p.id)+'"></div>') +
+        '<div class="tst-card-body">' +
+          '<span class="tst-cat-tag">'+esc(testimonialCategoryName(p.category))+"</span>" +
+          (p.caption ? '<div class="tst-card-caption">'+esc(p.caption)+"</div>" : "") +
+          '<div class="tst-card-actions">' +
+            '<button class="btn btn-sm tst-download-btn" data-tst-action="download-hd" data-id="'+esc(p.id)+'">'+ICONS.download+" Download HD</button>" +
+            (mode==="admin" ? '<button class="tst-icon-btn" data-tst-action="edit-photo" data-id="'+esc(p.id)+'">'+ICONS.pencil+"</button>" : "") +
+            (mode==="admin" ? '<button class="tst-icon-btn danger" data-tst-action="delete-photo" data-id="'+esc(p.id)+'">'+ICONS.trash+"</button>" : "") +
+          "</div>" +
+        "</div>" +
+      "</div>";
+    }).join("") + "</div>";
+  }
+  function adminLoginModalHtml(){
+    return '<div class="overlay" data-tst-action="close-modal-bg"><div class="modal confirm-modal">' +
+      '<div class="modal-head"><h2>Admin Mode</h2><button class="tst-icon-btn" data-tst-action="close-modal">'+ICONS.x+"</button></div>" +
+      "<p>Enter the Admin password to upload, edit or delete testimonial photos.</p>" +
+      '<div class="field"><input type="password" id="tstAdminPwInput" placeholder="Admin password" autofocus /></div>' +
+      '<div class="modal-actions"><button class="btn" data-tst-action="close-modal">Cancel</button><button class="btn btn-primary" data-tst-action="submit-admin-password">Unlock</button></div>' +
+    "</div></div>";
+  }
+  function uploadModalHtml(){
+    const pending = (modal.draft && modal.draft.pending) || [];
+    const cat = (modal.draft && modal.draft.category) || TESTIMONIAL_CATEGORIES[0].id;
+    const uploading = !!modal.uploading;
+    return '<div class="overlay" data-tst-action="close-modal-bg"><div class="modal">' +
+      '<div class="modal-head"><h2>Add Testimonial Photos</h2>' + (uploading ? "" : '<button class="tst-icon-btn" data-tst-action="close-modal">'+ICONS.x+"</button>") + "</div>" +
+      '<p class="modal-sub">Photos upload in their original HD quality — nothing is compressed.</p>' +
+      '<div class="field"><label>Category</label><select id="tstUploadCategory" data-tst-upload-category '+(uploading?"disabled":"")+">" +
+        TESTIMONIAL_CATEGORIES.map(function(c){ return '<option value="'+c.id+'" '+(c.id===cat?"selected":"")+">"+esc(c.name)+"</option>"; }).join("") +
+      "</select></div>" +
+      '<div class="field"><label>Photos <span class="hint">— you can select more than one</span></label>' +
+        '<input type="file" id="tstFileInput" accept="image/*" multiple '+(uploading?"disabled":"")+" /></div>" +
+      (pending.length ? '<div class="tst-pending-grid">' + pending.map(function(p){
+        return '<div class="tst-pending-item"><img class="tst-pending-thumb" src="'+esc(p.previewUrl)+'" />' +
+          '<div style="flex:1;display:flex;flex-direction:column;gap:4px;min-width:0;">' +
+            '<div style="font-size:12px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(p.file.name)+"</div>" +
+            '<input type="text" placeholder="Case description (optional)" data-tst-caption-id="'+p.localId+'" value="'+esc(p.caption||"")+'" '+(uploading?"disabled":"")+" />" +
+          "</div>" +
+          (uploading ? "" : '<button class="tst-icon-btn" data-tst-action="remove-pending" data-local-id="'+p.localId+'">'+ICONS.x+"</button>") +
+        "</div>";
+      }).join("") + "</div>" : "") +
+      (uploading ? '<p class="tst-upload-progress">Uploading '+modal.uploadIndex+" of "+modal.uploadTotal+"…</p>" : "") +
+      '<div class="modal-actions">' + (uploading ? "" : '<button class="btn" data-tst-action="close-modal">Cancel</button>') +
+        '<button class="btn btn-primary" data-tst-action="do-upload" '+(uploading?"disabled":"")+'>'+(uploading?"Uploading…":"Upload")+"</button>" +
+      "</div>" +
+    "</div></div>";
+  }
+  function editModalHtml(){
+    return '<div class="overlay" data-tst-action="close-modal-bg"><div class="modal">' +
+      '<div class="modal-head"><h2>Edit Photo</h2><button class="tst-icon-btn" data-tst-action="close-modal">'+ICONS.x+"</button></div>" +
+      '<div class="field"><label>Category</label><select id="tstEditCategory">' +
+        TESTIMONIAL_CATEGORIES.map(function(c){ return '<option value="'+c.id+'" '+(c.id===modal.category?"selected":"")+">"+esc(c.name)+"</option>"; }).join("") +
+      "</select></div>" +
+      '<div class="field"><label>Case description</label><input type="text" id="tstEditCaption" value="'+esc(modal.caption||"")+'" /></div>' +
+      '<div class="modal-actions"><button class="btn" data-tst-action="close-modal">Cancel</button><button class="btn btn-primary" data-tst-action="save-edit">Save</button></div>' +
+    "</div></div>";
+  }
+  function confirmModalHtml(){
+    return '<div class="overlay" data-tst-action="close-modal-bg"><div class="modal confirm-modal">' +
+      '<div class="modal-head"><h2>'+esc(modal.title||"Are you sure?")+'</h2><button class="tst-icon-btn" data-tst-action="close-modal">'+ICONS.x+"</button></div>" +
+      "<p>"+esc(modal.body||"")+"</p>" +
+      '<div class="modal-actions"><button class="btn" data-tst-action="close-modal">Cancel</button><button class="btn btn-danger" data-tst-action="'+esc(modal.onConfirm)+'">Delete</button></div>' +
+    "</div></div>";
+  }
+  function modalHtml(){
+    if(!modal) return "";
+    if(modal.type === "admin-login") return adminLoginModalHtml();
+    if(modal.type === "upload") return uploadModalHtml();
+    if(modal.type === "edit") return editModalHtml();
+    if(modal.type === "confirm") return confirmModalHtml();
+    return "";
+  }
+  function lightboxHtml(){
+    if(!lightbox) return "";
+    const p = lightbox.photo;
+    const src = state.thumbs[p.id] || p.hdUrl || "";
+    return '<div class="lightbox-overlay" data-tst-action="close-lightbox-bg">' +
+      '<button class="lightbox-close" data-tst-action="close-lightbox">'+ICONS.x+"</button>" +
+      '<div class="lightbox-card">' + (src ? '<img src="'+esc(src)+'" />' : "") +
+        '<div class="lightbox-meta"><span class="tst-cat-tag">'+esc(testimonialCategoryName(p.category))+"</span>" +
+          (p.caption ? "<div>"+esc(p.caption)+"</div>" : "") +
+          '<button class="btn btn-primary" data-tst-action="download-hd" data-id="'+esc(p.id)+'">'+ICONS.download+" Download HD</button>" +
+        "</div>" +
+      "</div>" +
+    "</div>";
+  }
+  function toastHtml(){
+    if(!toastMsg) return "";
+    return '<div class="toast'+(toastIsError?" toast-error":"")+'">'+esc(toastMsg)+"</div>";
+  }
+
+  function bindFileInput(){
+    const inp = document.getElementById("tstFileInput");
+    if(!inp) return;
+    inp.onchange = function(){
+      syncUploadDraftFromDOM();
+      Array.prototype.slice.call(inp.files||[]).forEach(function(file){
+        modal.draft.pending.push({ localId: uid(), file: file, previewUrl: URL.createObjectURL(file), caption: "" });
+      });
+      render();
+    };
+  }
+  function render(){
+    const root = document.getElementById("app-testimonial");
+    if(!root) return;
+    root.innerHTML =
+      adminBannerHtml() + headerHtml() +
+      '<div class="tst-wrap"><div class="tst-head"><h1>Testimonial Photos</h1>' +
+      "<p>Browse real case photos by skin concern, and download the original HD file to share with customers.</p></div>" +
+      toolbarHtml() + gridHtml() + "</div>" +
+      modalHtml() + lightboxHtml() + toastHtml();
+    bindFileInput();
+  }
+
+  /* ============================= ACTIONS ============================= */
+  function syncUploadDraftFromDOM(){
+    if(!modal || modal.type !== "upload" || !modal.draft) return;
+    const root = document.getElementById("app-testimonial");
+    if(!root) return;
+    const catSel = root.querySelector("[data-tst-upload-category]");
+    if(catSel) modal.draft.category = catSel.value;
+    (modal.draft.pending||[]).forEach(function(item){
+      const inp = root.querySelector('[data-tst-caption-id="'+item.localId+'"]');
+      if(inp) item.caption = inp.value;
+    });
+  }
+  function doUpload(){
+    syncUploadDraftFromDOM();
+    if(!modal || modal.type !== "upload") return;
+    const pending = (modal.draft.pending||[]).slice();
+    const category = modal.draft.category || TESTIMONIAL_CATEGORIES[0].id;
+    if(!pending.length){ showToast("Please choose at least one photo first", true); return; }
+    if(!useDb || !storage){
+      showToast("Photo storage isn't connected right now — please reload the page and try again.", true);
+      return;
+    }
+    modal.uploading = true; modal.uploadIndex = 0; modal.uploadTotal = pending.length;
+    render();
+    (async function(){
+      let okCount = 0;
+      for(let i=0;i<pending.length;i++){
+        modal.uploadIndex = i+1; render();
+        try{
+          await saveTestimonialPhoto({ file: pending[i].file, category: category, caption: pending[i].caption||"" });
+          okCount++;
+        }catch(e){ console.warn("Upload failed for", pending[i].file && pending[i].file.name, e); }
+      }
+      modal = null;
+      render();
+      if(okCount === pending.length) showToast("Uploaded " + okCount + " photo" + (okCount>1?"s":"") + " in full HD quality");
+      else if(okCount > 0) showToast("Uploaded " + okCount + " of " + pending.length + " — the rest failed, please try again", true);
+      else showToast("Upload failed — please check your connection and try again", true);
+    })();
+  }
+  function saveEdit(){
+    const catSel = document.getElementById("tstEditCategory");
+    const capInput = document.getElementById("tstEditCaption");
+    const category = catSel ? catSel.value : modal.category;
+    const caption = capInput ? capInput.value : modal.caption;
+    const id = modal.photoId;
+    modal = null; render();
+    updateTestimonialPhoto(id, { category: category, caption: caption }).then(function(){
+      showToast("Saved");
+    }).catch(function(e){
+      showToast("Could not save: " + (e && e.message ? e.message : "please try again"), true);
+    });
+  }
+  function doDelete(id){
+    const photo = (state.photos||[]).find(function(x){ return x.id === id; });
+    modal = null; render();
+    if(!photo) return;
+    deleteTestimonialPhoto(photo).then(function(){
+      showToast("Deleted");
+    }).catch(function(e){
+      showToast("Could not delete: " + (e && e.message ? e.message : "please try again"), true);
+    });
+  }
+
+  document.addEventListener("click", function(e){
+    const root = document.getElementById("app-testimonial");
+    if(!root) return;
+    syncUploadDraftFromDOM();
+
+    const modeBtn = e.target.closest("[data-tst-mode]");
+    if(modeBtn && root.contains(modeBtn)){
+      const target = modeBtn.dataset.tstMode;
+      if(target === "admin" && !adminUnlocked){ modal = { type: "admin-login" }; render(); return; }
+      mode = target; render();
+      return;
+    }
+
+    const el = e.target.closest("[data-tst-action]");
+    if(!el || !root.contains(el)) return;
+    const action = el.dataset.tstAction;
+    const id = el.dataset.id;
+
+    if((action === "close-modal-bg" || action === "close-modal") && modal && modal.uploading) return;
+
+    switch(action){
+      case "close-modal-bg":
+        if(e.target !== el) break;
+        modal = null; render();
+        break;
+      case "close-modal":
+        modal = null; render();
+        break;
+      case "open-upload":
+        modal = { type: "upload", draft: { pending: [], category: TESTIMONIAL_CATEGORIES[0].id } };
+        render();
+        break;
+      case "remove-pending":
+        if(modal && modal.draft){
+          modal.draft.pending = modal.draft.pending.filter(function(p){ return p.localId !== el.dataset.localId; });
+          render();
+        }
+        break;
+      case "do-upload":
+        doUpload();
+        break;
+      case "edit-photo":
+        var p1 = (state.photos||[]).find(function(x){ return x.id === id; });
+        if(p1){ modal = { type:"edit", photoId:id, category:p1.category, caption:p1.caption||"" }; render(); }
+        break;
+      case "save-edit":
+        saveEdit();
+        break;
+      case "delete-photo":
+        var p2 = (state.photos||[]).find(function(x){ return x.id === id; });
+        if(p2){ modal = { type:"confirm", title:"Delete this photo?", body:"This will permanently remove the photo and its HD file for the whole team. This can't be undone.", onConfirm:"do-delete", photoId:id }; render(); }
+        break;
+      case "do-delete":
+        doDelete(modal.photoId);
+        break;
+      case "view-photo":
+        var p3 = (state.photos||[]).find(function(x){ return x.id === id; });
+        if(p3){ lightbox = { photo: p3 }; render(); }
+        break;
+      case "close-lightbox-bg":
+        if(e.target !== el) break;
+        lightbox = null; render();
+        break;
+      case "close-lightbox":
+        lightbox = null; render();
+        break;
+      case "download-hd":
+        var p4 = (state.photos||[]).find(function(x){ return x.id === id; });
+        if(p4) downloadTestimonialHD(p4);
+        break;
+      case "set-filter":
+        filter = el.dataset.filter; render();
+        break;
+      case "submit-admin-password":
+        var pwInput = root.querySelector("#tstAdminPwInput");
+        var val = pwInput ? pwInput.value : "";
+        if(val === ADMIN_PASSWORD){
+          adminUnlocked = true;
+          try{ sessionStorage.setItem("csc_admin_unlocked", "1"); }catch(e2){}
+          mode = "admin"; modal = null; render();
+        } else {
+          showToast("Wrong password", true);
+        }
+        break;
+    }
+  });
+
+  document.addEventListener("keydown", function(e){
+    const root = document.getElementById("app-testimonial");
+    if(!root) return;
+    if(e.key === "Enter" && modal && modal.type === "admin-login"){
+      const pwInput = document.getElementById("tstAdminPwInput");
+      if(document.activeElement === pwInput){
+        e.preventDefault();
+        if(pwInput.value === ADMIN_PASSWORD){
+          adminUnlocked = true;
+          try{ sessionStorage.setItem("csc_admin_unlocked", "1"); }catch(e2){}
+          mode = "admin"; modal = null; render();
+        } else {
+          showToast("Wrong password", true);
+        }
+      }
+      return;
+    }
+    if(e.key !== "Escape") return;
+    if(modal && modal.uploading) return;
+    if(lightbox){ lightbox = null; render(); return; }
+    if(modal){ modal = null; render(); }
   });
 
   /* ============================= INIT ============================= */
