@@ -5886,7 +5886,7 @@ html[data-theme="dark"] #app-testimonial{
 
   /* ============================= STATE ============================= */
   let state = loadLocalCache() || { photos: [], thumbs: {} };
-  let db = null, storage = null, useDb = false;
+  let db = null, useDb = false;
   const ADMIN_PASSWORD = "agh030222";
   let mode = "csc";
   let adminUnlocked = false;
@@ -5932,26 +5932,74 @@ html[data-theme="dark"] #app-testimonial{
 
   try{
     if(typeof firebase !== "undefined" && typeof FIREBASE_CONFIG_FOLLOWUP !== "undefined"){
-      // Reuses the SAME named ("followup") Firebase app as the Follow Up
-      // Hub above — same Firestore project, so no new Firebase project or
-      // password is needed, just (if not done already) turning on Storage
-      // for the "csc-follow-up" project in the Firebase console.
+      // Reuses the SAME named ("followup") Firebase app/project as the
+      // Follow Up Hub above — same free Firestore database, no new project
+      // or password needed. HD originals are stored as Firestore documents
+      // (see tstSaveChunkedFile below), NOT Firebase Storage, specifically
+      // so this never needs the paid Blaze plan — Firestore itself stays
+      // free on the Spark plan. The tradeoff: a single photo tops out at
+      // MAX_CHUNKED_FILE_BYTES (see below), and the project's free 1GiB
+      // Firestore storage quota is shared with everything else in it.
       const fuApp = firebase.apps.some(function(a){ return a.name === "followup"; })
         ? firebase.app("followup")
         : firebase.initializeApp(FIREBASE_CONFIG_FOLLOWUP, "followup");
       db = fuApp.firestore();
       useDb = true;
-      try{ storage = fuApp.storage(); }catch(e){
-        storage = null;
-        console.warn("Testimonial Photos: Firebase Storage isn't available yet (the csc-follow-up project may still need the Blaze plan/Storage turned on)", e);
-      }
       initDb();
     }
   }catch(e){
     console.warn("Testimonial Photos: Firebase unavailable, staying in local-only mode", e);
   }
 
-  /* ============================= HD UPLOAD / DOWNLOAD ============================= */
+  /* ============================= HD UPLOAD / DOWNLOAD =============================
+     No Firebase Storage (that needs the paid Blaze plan) — HD originals are
+     split across plain Firestore documents instead, the same proven
+     approach the Training Hub already uses for large files above
+     (see colFileChunks/thSaveChunkedFile): a file's exact original bytes
+     (as a base64 data: URL, never recompressed) get sliced into
+     CHUNK_CHARS-sized pieces and written to deterministic doc ids
+     ("<photoId>_0", "<photoId>_1", …) in testimonialPhotoChunks, then
+     stitched back together on download. Firestore caps a single document
+     at ~1MiB, so MAX_CHUNKED_FILE_BYTES keeps some margin under that
+     per chunk and sets the ceiling for one photo's original file size. */
+  const MAX_CHUNKED_FILE_BYTES = 9*1024*1024;
+  const CHUNK_CHARS = 700*1024;
+  function readFileAsDataURL(file){
+    return new Promise(function(resolve, reject){
+      const r = new FileReader();
+      r.onerror = function(){ reject(new Error("Could not read the image file")); };
+      r.onload = function(){ resolve(r.result); };
+      r.readAsDataURL(file);
+    });
+  }
+  function dataURLToBlob(dataUrl){
+    const comma = dataUrl.indexOf(",");
+    const meta = dataUrl.slice(5, comma); // "image/jpeg;base64"
+    const mime = meta.split(";")[0] || "application/octet-stream";
+    const bin = atob(dataUrl.slice(comma+1));
+    const bytes = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: mime });
+  }
+  async function tstSaveChunkedFile(photoId, dataUrl){
+    const chunks = [];
+    for(let i=0;i<dataUrl.length;i+=CHUNK_CHARS) chunks.push(dataUrl.slice(i, i+CHUNK_CHARS));
+    for(let i=0;i<chunks.length;i++){
+      await db.collection("testimonialPhotoChunks").doc(photoId+"_"+i).set({ parentId: photoId, index: i, data: chunks[i] });
+    }
+    return chunks.length;
+  }
+  async function tstDeleteChunkedFile(photoId, count){
+    const jobs = [];
+    for(let i=0;i<(count||0);i++) jobs.push(db.collection("testimonialPhotoChunks").doc(photoId+"_"+i).delete());
+    await Promise.all(jobs);
+  }
+  async function tstLoadChunkedFile(photoId, count){
+    const snaps = await Promise.all(
+      Array.from({length:count||0}, function(_, i){ return db.collection("testimonialPhotoChunks").doc(photoId+"_"+i).get(); })
+    );
+    return snaps.map(function(s){ return s.exists ? (s.data()||{}).data || "" : ""; }).join("");
+  }
   function makeThumbnail(file){
     return new Promise(function(resolve, reject){
       const reader = new FileReader();
@@ -5973,33 +6021,29 @@ html[data-theme="dark"] #app-testimonial{
       reader.readAsDataURL(file);
     });
   }
-  function uploadHDOriginal(file, id){
-    const path = "testimonials/" + id + "/" + file.name.replace(/[^a-zA-Z0-9_.\-]/g, "_");
-    const ref = storage.ref().child(path);
-    return ref.put(file, { contentType: file.type || "application/octet-stream" })
-      .then(function(snap){ return snap.ref.getDownloadURL(); })
-      .then(function(url){ return { path: path, url: url }; });
-  }
   async function saveTestimonialPhoto(opts){
-    if(!useDb || !db || !storage) throw new Error("Photo storage isn't connected right now — please reload the page and try again.");
+    if(!useDb || !db) throw new Error("Photo storage isn't connected right now — please reload the page and try again.");
+    if(opts.file.size > MAX_CHUNKED_FILE_BYTES){
+      throw new Error((opts.file.name||"This photo") + " is too large (over " + Math.round(MAX_CHUNKED_FILE_BYTES/1024/1024) + "MB) — please use a smaller photo");
+    }
     const id = uid();
     const thumbDataUrl = await makeThumbnail(opts.file);
-    const hd = await uploadHDOriginal(opts.file, id);
+    const hdDataUrl = await readFileAsDataURL(opts.file);
+    const chunkCount = await tstSaveChunkedFile(id, hdDataUrl);
     await db.collection("testimonialPhotos").doc(id).set({
       category: opts.category,
       caption: opts.caption || "",
       fileName: opts.file.name,
       fileType: opts.file.type || "",
       fileSize: opts.file.size || 0,
-      hdPath: hd.path,
-      hdUrl: hd.url,
+      chunkCount: chunkCount,
       createdAt: Date.now(),
     });
     await db.collection("testimonialThumbs").doc(id).set({ dataUrl: thumbDataUrl });
     return id;
   }
   async function deleteTestimonialPhoto(photo){
-    try{ if(photo.hdPath) await storage.ref().child(photo.hdPath).delete(); }catch(e){ /* best effort — e.g. already gone */ }
+    try{ await tstDeleteChunkedFile(photo.id, photo.chunkCount); }catch(e){ /* best effort — e.g. already gone */ }
     try{ await db.collection("testimonialThumbs").doc(photo.id).delete(); }catch(e){}
     await db.collection("testimonialPhotos").doc(photo.id).delete();
   }
@@ -6007,12 +6051,11 @@ html[data-theme="dark"] #app-testimonial{
     await db.collection("testimonialPhotos").doc(id).set(patch, { merge: true });
   }
   function downloadTestimonialHD(photo){
-    if(!photo || !photo.hdUrl){ showToast("This photo's HD file isn't available — check the Firebase Storage setup", true); return; }
+    if(!photo || !photo.chunkCount){ showToast("This photo's HD file isn't available right now", true); return; }
     showToast("Preparing HD download…");
-    fetch(photo.hdUrl).then(function(r){
-      if(!r.ok) throw new Error("Download failed (" + r.status + ")");
-      return r.blob();
-    }).then(function(blob){
+    tstLoadChunkedFile(photo.id, photo.chunkCount).then(function(dataUrl){
+      if(!dataUrl) throw new Error("The HD file is missing or incomplete");
+      const blob = dataURLToBlob(dataUrl);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url; a.download = photo.fileName || "testimonial-photo";
@@ -6089,7 +6132,7 @@ html[data-theme="dark"] #app-testimonial{
     const uploading = !!modal.uploading;
     return '<div class="overlay" data-tst-action="close-modal-bg"><div class="modal">' +
       '<div class="modal-head"><h2>Add Testimonial Photos</h2>' + (uploading ? "" : '<button class="tst-icon-btn" data-tst-action="close-modal">'+ICONS.x+"</button>") + "</div>" +
-      '<p class="modal-sub">Photos upload in their original HD quality — nothing is compressed.</p>' +
+      '<p class="modal-sub">Photos upload in their original HD quality — nothing is compressed. (Up to 9MB per photo.)</p>' +
       '<div class="field"><label>Category</label><select id="tstUploadCategory" data-tst-upload-category '+(uploading?"disabled":"")+">" +
         TESTIMONIAL_CATEGORIES.map(function(c){ return '<option value="'+c.id+'" '+(c.id===cat?"selected":"")+">"+esc(c.name)+"</option>"; }).join("") +
       "</select></div>" +
@@ -6195,7 +6238,7 @@ html[data-theme="dark"] #app-testimonial{
     const pending = (modal.draft.pending||[]).slice();
     const category = modal.draft.category || TESTIMONIAL_CATEGORIES[0].id;
     if(!pending.length){ showToast("Please choose at least one photo first", true); return; }
-    if(!useDb || !storage){
+    if(!useDb){
       showToast("Photo storage isn't connected right now — please reload the page and try again.", true);
       return;
     }
@@ -6203,18 +6246,22 @@ html[data-theme="dark"] #app-testimonial{
     render();
     (async function(){
       let okCount = 0;
+      let firstErrorMsg = "";
       for(let i=0;i<pending.length;i++){
         modal.uploadIndex = i+1; render();
         try{
           await saveTestimonialPhoto({ file: pending[i].file, category: category, caption: pending[i].caption||"" });
           okCount++;
-        }catch(e){ console.warn("Upload failed for", pending[i].file && pending[i].file.name, e); }
+        }catch(e){
+          console.warn("Upload failed for", pending[i].file && pending[i].file.name, e);
+          if(!firstErrorMsg) firstErrorMsg = e && e.message ? e.message : "";
+        }
       }
       modal = null;
       render();
       if(okCount === pending.length) showToast("Uploaded " + okCount + " photo" + (okCount>1?"s":"") + " in full HD quality");
-      else if(okCount > 0) showToast("Uploaded " + okCount + " of " + pending.length + " — the rest failed, please try again", true);
-      else showToast("Upload failed — please check your connection and try again", true);
+      else if(okCount > 0) showToast("Uploaded " + okCount + " of " + pending.length + " — the rest failed" + (firstErrorMsg ? (": " + firstErrorMsg) : ", please try again"), true);
+      else showToast(firstErrorMsg || "Upload failed — please check your connection and try again", true);
     })();
   }
   function saveEdit(){
