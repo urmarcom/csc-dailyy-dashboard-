@@ -5815,6 +5815,16 @@ html[data-theme="dark"] #app-testimonial{
   }
 #app-testimonial .tst-pending-item input:focus{border-color:var(--accent);}
 #app-testimonial .tst-upload-progress{font-size:12.5px;color:var(--ink-2);margin-top:10px;}
+#app-testimonial .tst-toolbar-admin-btns{display:flex;gap:8px;flex-wrap:wrap;}
+#app-testimonial .tst-cat-manage-list{display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto;}
+#app-testimonial .tst-cat-manage-row{display:flex;align-items:center;gap:8px;}
+#app-testimonial .tst-cat-manage-order{display:flex;flex-direction:column;gap:2px;flex:none;}
+#app-testimonial .tst-cat-manage-order .tst-icon-btn{width:22px;height:18px;}
+#app-testimonial .tst-cat-manage-row input[type=text]{flex:1;padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--ink);font-size:13px;outline:none;}
+#app-testimonial .tst-cat-manage-row input[type=text]:focus{border-color:var(--accent);}
+#app-testimonial .tst-cat-manage-count{font-size:11px;color:var(--ink-3);white-space:nowrap;flex:none;}
+#app-testimonial .tst-cat-add-row{display:flex;gap:8px;}
+#app-testimonial .tst-cat-add-row input[type=text]{flex:1;}
 #app-testimonial .lightbox-overlay{
     position:fixed;inset:0;background:rgba(10,14,13,0.85);z-index:110;display:flex;align-items:center;justify-content:center;padding:5vh 24px;
   }
@@ -5853,16 +5863,38 @@ html[data-theme="dark"] #app-testimonial{
     shield:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l7 2.6v5.4c0 4.6-3 8.1-7 9-4-.9-7-4.4-7-9V6.1z"/></svg>',
     userIcon:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.3" r="3.3"/><path d="M5 19.5c1.3-3.3 4-5 7-5s5.7 1.7 7 5"/></svg>',
     download:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><polyline points="7.5 11 12 15.5 16.5 11"/><path d="M4.5 17.5v2A1.8 1.8 0 0 0 6.3 21.3h11.4A1.8 1.8 0 0 0 19.5 19.5v-2"/></svg>',
+    check:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12.5 9.5 18 20 6"/></svg>',
+    up:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 14.5 12 8.5 18 14.5"/></svg>',
+    down:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9.5 12 15.5 18 9.5"/></svg>',
   };
 
-  const TESTIMONIAL_CATEGORIES = [
-    { id:"melasma", name:"Melasma" },
-    { id:"freckles", name:"Freckles" },
-    { id:"age-spot", name:"Age Spot" },
-    { id:"abnom", name:"ABNOM" },
-    { id:"uneven-skin-tone", name:"Uneven Skin Tone" },
-    { id:"acne", name:"Acne" },
-  ];
+  // Categories are admin-editable (rename / add / delete / reorder) and
+  // live in Firestore (testimonialCategories) so changes sync to the whole
+  // team, same as photos. defaultTestimonialCategories() is only the
+  // one-time seed for a brand-new database — after that, Firestore is the
+  // source of truth. A photo stores its category by id, never by name, so
+  // renaming a category never touches existing photos.
+  function defaultTestimonialCategories(){
+    return [
+      { id:"melasma", name:"Melasma", order:0 },
+      { id:"freckles", name:"Freckles", order:1 },
+      { id:"age-spot", name:"Age Spot", order:2 },
+      { id:"abnom", name:"ABNOM", order:3 },
+      { id:"uneven-skin-tone", name:"Uneven Skin Tone", order:4 },
+      { id:"acne", name:"Acne", order:5 },
+    ];
+  }
+  function sortedCategories(){
+    return (state.categories||[]).slice().sort(function(a,b){ return (a.order||0)-(b.order||0); });
+  }
+  function slugifyCategoryName(name){
+    let base = String(name||"").toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
+    if(!base) base = "category";
+    const existingIds = (state.categories||[]).map(function(c){ return c.id; });
+    let id = base, n = 2;
+    while(existingIds.indexOf(id) !== -1){ id = base + "-" + n; n++; }
+    return id;
+  }
 
   function esc(s){
     return String(s==null?"":s).replace(/[&<>"']/g, function(c){
@@ -5886,6 +5918,7 @@ html[data-theme="dark"] #app-testimonial{
 
   /* ============================= STATE ============================= */
   let state = loadLocalCache() || { photos: [], thumbs: {} };
+  if(!state.categories || !state.categories.length) state.categories = defaultTestimonialCategories();
   let db = null, useDb = false;
   const ADMIN_PASSWORD = "agh030222";
   let mode = "csc";
@@ -5904,8 +5937,11 @@ html[data-theme="dark"] #app-testimonial{
   }
 
   function testimonialCategoryName(id){
-    const c = TESTIMONIAL_CATEGORIES.find(function(x){ return x.id === id; });
-    return c ? c.name : id;
+    const c = (state.categories||[]).find(function(x){ return x.id === id; });
+    if(c) return c.name;
+    // The category was deleted but some photos still reference its old id —
+    // show something readable instead of a blank tag.
+    return String(id||"Uncategorized").replace(/-/g, " ").replace(/\b\w/g, function(m){ return m.toUpperCase(); });
   }
   function filteredList(){
     const list = (state.photos||[]).slice().sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
@@ -5928,6 +5964,27 @@ html[data-theme="dark"] #app-testimonial{
       saveLocalCache();
       render();
     }, function(err){ console.warn("testimonialThumbs sync error", err); });
+
+    // Categories: one-time-seed-if-empty, same pattern as Follow Up Hub's
+    // own seedDb() above — categoriesSeedAttempted stops it from retrying
+    // on every snapshot while the very first seed write is still in flight.
+    let categoriesSeedAttempted = false;
+    db.collection("testimonialCategories").onSnapshot(function(snap){
+      if(snap.empty){
+        if(!categoriesSeedAttempted){
+          categoriesSeedAttempted = true;
+          Promise.all(defaultTestimonialCategories().map(function(c){
+            return db.collection("testimonialCategories").doc(c.id).set({ name: c.name, order: c.order });
+          })).catch(function(e){ console.warn("testimonialCategories seed failed", e); });
+        }
+        // Keep showing the built-in defaults locally while the seed write lands.
+        if(!state.categories || !state.categories.length) state.categories = defaultTestimonialCategories();
+      } else {
+        state.categories = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+      }
+      saveLocalCache();
+      render();
+    }, function(err){ console.warn("testimonialCategories sync error", err); });
   }
 
   try{
@@ -6050,6 +6107,19 @@ html[data-theme="dark"] #app-testimonial{
   async function updateTestimonialPhoto(id, patch){
     await db.collection("testimonialPhotos").doc(id).set(patch, { merge: true });
   }
+  async function addTestimonialCategory(name){
+    if(!useDb || !db) throw new Error("Not connected right now — please reload the page and try again.");
+    const id = slugifyCategoryName(name);
+    const maxOrder = (state.categories||[]).reduce(function(m,c){ return Math.max(m, c.order||0); }, -1);
+    await db.collection("testimonialCategories").doc(id).set({ name: name, order: maxOrder+1 });
+    return id;
+  }
+  async function updateTestimonialCategory(id, patch){
+    await db.collection("testimonialCategories").doc(id).set(patch, { merge: true });
+  }
+  async function deleteTestimonialCategory(id){
+    await db.collection("testimonialCategories").doc(id).delete();
+  }
   function downloadTestimonialHD(photo){
     if(!photo || !photo.chunkCount){ showToast("This photo's HD file isn't available right now", true); return; }
     showToast("Preparing HD download…");
@@ -6087,12 +6157,15 @@ html[data-theme="dark"] #app-testimonial{
     "</div>";
   }
   function toolbarHtml(){
-    const chips = [{id:"all", name:"All Photos"}].concat(TESTIMONIAL_CATEGORIES);
+    const chips = [{id:"all", name:"All Photos"}].concat(sortedCategories());
     return '<div class="tst-toolbar"><div class="tst-filter-row">' + chips.map(function(c){
       const n = c.id==="all" ? (state.photos||[]).length : (state.photos||[]).filter(function(p){ return p.category===c.id; }).length;
       return '<button class="tst-filter-chip'+(filter===c.id?" active":"")+'" data-tst-action="set-filter" data-filter="'+c.id+'">'+esc(c.name)+' <span class="cnt">'+n+"</span></button>";
     }).join("") + "</div>" +
-      (mode==="admin" ? '<button class="btn btn-primary" data-tst-action="open-upload">'+ICONS.plus+" Add Photos</button>" : "") +
+      (mode==="admin" ? '<div class="tst-toolbar-admin-btns">' +
+        '<button class="btn" data-tst-action="open-manage-categories">'+ICONS.pencil+" Manage Categories</button>" +
+        '<button class="btn btn-primary" data-tst-action="open-upload">'+ICONS.plus+" Add Photos</button>" +
+      "</div>" : "") +
     "</div>";
   }
   function gridHtml(){
@@ -6128,13 +6201,14 @@ html[data-theme="dark"] #app-testimonial{
   }
   function uploadModalHtml(){
     const pending = (modal.draft && modal.draft.pending) || [];
-    const cat = (modal.draft && modal.draft.category) || TESTIMONIAL_CATEGORIES[0].id;
+    const cats = sortedCategories();
+    const cat = (modal.draft && modal.draft.category) || (cats[0]||{}).id || "";
     const uploading = !!modal.uploading;
     return '<div class="overlay" data-tst-action="close-modal-bg"><div class="modal">' +
       '<div class="modal-head"><h2>Add Testimonial Photos</h2>' + (uploading ? "" : '<button class="tst-icon-btn" data-tst-action="close-modal">'+ICONS.x+"</button>") + "</div>" +
       '<p class="modal-sub">Photos upload in their original HD quality — nothing is compressed. (Up to 9MB per photo.)</p>' +
       '<div class="field"><label>Category</label><select id="tstUploadCategory" data-tst-upload-category '+(uploading?"disabled":"")+">" +
-        TESTIMONIAL_CATEGORIES.map(function(c){ return '<option value="'+c.id+'" '+(c.id===cat?"selected":"")+">"+esc(c.name)+"</option>"; }).join("") +
+        cats.map(function(c){ return '<option value="'+c.id+'" '+(c.id===cat?"selected":"")+">"+esc(c.name)+"</option>"; }).join("") +
       "</select></div>" +
       '<div class="field"><label>Photos <span class="hint">— you can select more than one</span></label>' +
         '<input type="file" id="tstFileInput" accept="image/*" multiple '+(uploading?"disabled":"")+" /></div>" +
@@ -6157,7 +6231,7 @@ html[data-theme="dark"] #app-testimonial{
     return '<div class="overlay" data-tst-action="close-modal-bg"><div class="modal">' +
       '<div class="modal-head"><h2>Edit Photo</h2><button class="tst-icon-btn" data-tst-action="close-modal">'+ICONS.x+"</button></div>" +
       '<div class="field"><label>Category</label><select id="tstEditCategory">' +
-        TESTIMONIAL_CATEGORIES.map(function(c){ return '<option value="'+c.id+'" '+(c.id===modal.category?"selected":"")+">"+esc(c.name)+"</option>"; }).join("") +
+        sortedCategories().map(function(c){ return '<option value="'+c.id+'" '+(c.id===modal.category?"selected":"")+">"+esc(c.name)+"</option>"; }).join("") +
       "</select></div>" +
       '<div class="field"><label>Case description</label><input type="text" id="tstEditCaption" value="'+esc(modal.caption||"")+'" /></div>' +
       '<div class="modal-actions"><button class="btn" data-tst-action="close-modal">Cancel</button><button class="btn btn-primary" data-tst-action="save-edit">Save</button></div>' +
@@ -6170,18 +6244,49 @@ html[data-theme="dark"] #app-testimonial{
       '<div class="modal-actions"><button class="btn" data-tst-action="close-modal">Cancel</button><button class="btn btn-danger" data-tst-action="'+esc(modal.onConfirm)+'">Delete</button></div>' +
     "</div></div>";
   }
+  function manageCategoriesModalHtml(){
+    const cats = sortedCategories();
+    const draft = modal.draft || { newName: "", edits: {} };
+    return '<div class="overlay" data-tst-action="close-modal-bg"><div class="modal">' +
+      '<div class="modal-head"><h2>Manage Categories</h2><button class="tst-icon-btn" data-tst-action="close-modal">'+ICONS.x+"</button></div>" +
+      '<p class="modal-sub">Rename, reorder, add or remove the category filters. Renaming never affects which photos already have that category.</p>' +
+      '<div class="tst-cat-manage-list">' + cats.map(function(c, i){
+        const count = (state.photos||[]).filter(function(p){ return p.category===c.id; }).length;
+        const val = draft.edits && draft.edits[c.id] !== undefined ? draft.edits[c.id] : c.name;
+        return '<div class="tst-cat-manage-row">' +
+          '<div class="tst-cat-manage-order">' +
+            '<button class="tst-icon-btn" data-tst-action="move-category-up" data-id="'+esc(c.id)+'" '+(i===0?"disabled":"")+'>'+ICONS.up+"</button>" +
+            '<button class="tst-icon-btn" data-tst-action="move-category-down" data-id="'+esc(c.id)+'" '+(i===cats.length-1?"disabled":"")+'>'+ICONS.down+"</button>" +
+          "</div>" +
+          '<input type="text" data-tst-cat-name-id="'+esc(c.id)+'" value="'+esc(val)+'" />' +
+          '<span class="tst-cat-manage-count">'+count+" photo"+(count===1?"":"s")+"</span>" +
+          '<button class="tst-icon-btn" data-tst-action="save-category-name" data-id="'+esc(c.id)+'" title="Save name">'+ICONS.check+"</button>" +
+          '<button class="tst-icon-btn danger" data-tst-action="delete-category" data-id="'+esc(c.id)+'" title="Delete category">'+ICONS.trash+"</button>" +
+        "</div>";
+      }).join("") + "</div>" +
+      (cats.length === 0 ? '<p class="modal-sub">No categories yet — add one below.</p>' : "") +
+      '<div class="field" style="margin-top:16px;"><label>Add a new category</label>' +
+        '<div class="tst-cat-add-row">' +
+          '<input type="text" id="tstNewCategoryInput" placeholder="e.g. Rosacea" value="'+esc(draft.newName||"")+'" />' +
+          '<button class="btn btn-primary" data-tst-action="add-category">'+ICONS.plus+" Add</button>" +
+        "</div>" +
+      "</div>" +
+      '<div class="modal-actions"><button class="btn" data-tst-action="close-modal">Done</button></div>' +
+    "</div></div>";
+  }
   function modalHtml(){
     if(!modal) return "";
     if(modal.type === "admin-login") return adminLoginModalHtml();
     if(modal.type === "upload") return uploadModalHtml();
     if(modal.type === "edit") return editModalHtml();
     if(modal.type === "confirm") return confirmModalHtml();
+    if(modal.type === "manage-categories") return manageCategoriesModalHtml();
     return "";
   }
   function lightboxHtml(){
     if(!lightbox) return "";
     const p = lightbox.photo;
-    const src = state.thumbs[p.id] || p.hdUrl || "";
+    const src = state.thumbs[p.id] || "";
     return '<div class="lightbox-overlay" data-tst-action="close-lightbox-bg">' +
       '<button class="lightbox-close" data-tst-action="close-lightbox">'+ICONS.x+"</button>" +
       '<div class="lightbox-card">' + (src ? '<img src="'+esc(src)+'" />' : "") +
@@ -6209,6 +6314,12 @@ html[data-theme="dark"] #app-testimonial{
     };
   }
   function render(){
+    // Capture any not-yet-saved typed text from the currently-open modal
+    // BEFORE innerHTML is torn down — covers both a direct user action and
+    // a render triggered by an unrelated Firestore snapshot arriving while
+    // someone is mid-edit (otherwise that typed text would just vanish).
+    syncUploadDraftFromDOM();
+    syncManageCategoriesDraftFromDOM();
     const root = document.getElementById("app-testimonial");
     if(!root) return;
     root.innerHTML =
@@ -6232,11 +6343,23 @@ html[data-theme="dark"] #app-testimonial{
       if(inp) item.caption = inp.value;
     });
   }
+  function syncManageCategoriesDraftFromDOM(){
+    if(!modal || modal.type !== "manage-categories") return;
+    if(!modal.draft) modal.draft = { newName: "", edits: {} };
+    const root = document.getElementById("app-testimonial");
+    if(!root) return;
+    const newInp = root.querySelector("#tstNewCategoryInput");
+    if(newInp) modal.draft.newName = newInp.value;
+    (state.categories||[]).forEach(function(c){
+      const inp = root.querySelector('[data-tst-cat-name-id="'+c.id+'"]');
+      if(inp) modal.draft.edits[c.id] = inp.value;
+    });
+  }
   function doUpload(){
     syncUploadDraftFromDOM();
     if(!modal || modal.type !== "upload") return;
     const pending = (modal.draft.pending||[]).slice();
-    const category = modal.draft.category || TESTIMONIAL_CATEGORIES[0].id;
+    const category = modal.draft.category || (sortedCategories()[0]||{}).id || "";
     if(!pending.length){ showToast("Please choose at least one photo first", true); return; }
     if(!useDb){
       showToast("Photo storage isn't connected right now — please reload the page and try again.", true);
@@ -6292,6 +6415,7 @@ html[data-theme="dark"] #app-testimonial{
     const root = document.getElementById("app-testimonial");
     if(!root) return;
     syncUploadDraftFromDOM();
+    syncManageCategoriesDraftFromDOM();
 
     const modeBtn = e.target.closest("[data-tst-mode]");
     if(modeBtn && root.contains(modeBtn)){
@@ -6317,7 +6441,7 @@ html[data-theme="dark"] #app-testimonial{
         modal = null; render();
         break;
       case "open-upload":
-        modal = { type: "upload", draft: { pending: [], category: TESTIMONIAL_CATEGORIES[0].id } };
+        modal = { type: "upload", draft: { pending: [], category: (sortedCategories()[0]||{}).id || "" } };
         render();
         break;
       case "remove-pending":
@@ -6361,6 +6485,61 @@ html[data-theme="dark"] #app-testimonial{
       case "set-filter":
         filter = el.dataset.filter; render();
         break;
+      case "open-manage-categories":
+        modal = { type: "manage-categories", draft: { newName: "", edits: {} } };
+        render();
+        break;
+      case "move-category-up":
+      case "move-category-down": {
+        const cats = sortedCategories();
+        const idx = cats.findIndex(function(c){ return c.id === id; });
+        const swapWith = action === "move-category-up" ? idx-1 : idx+1;
+        if(idx<0 || swapWith<0 || swapWith>=cats.length) break;
+        const a = cats[idx], b = cats[swapWith];
+        const orderA = a.order||0, orderB = b.order||0;
+        a.order = orderB; b.order = orderA; render(); // optimistic, snapshot will confirm
+        updateTestimonialCategory(a.id, { order: orderB }).catch(function(){});
+        updateTestimonialCategory(b.id, { order: orderA }).catch(function(){});
+        break;
+      }
+      case "save-category-name": {
+        const name = (modal && modal.draft && modal.draft.edits && modal.draft.edits[id] !== undefined) ? modal.draft.edits[id] : "";
+        const trimmed = name.trim();
+        if(!trimmed){ showToast("Category name can't be empty", true); break; }
+        updateTestimonialCategory(id, { name: trimmed }).then(function(){
+          showToast("Saved");
+        }).catch(function(e){
+          showToast("Could not save: " + (e && e.message ? e.message : "please try again"), true);
+        });
+        break;
+      }
+      case "delete-category": {
+        const cat = (state.categories||[]).find(function(c){ return c.id === id; });
+        const count = (state.photos||[]).filter(function(p){ return p.category === id; }).length;
+        const msg = count > 0
+          ? ('Delete "' + (cat?cat.name:id) + '"? ' + count + " photo" + (count===1?"":"s") + " will keep this category internally but won't show under any filter chip anymore (still visible under All Photos).")
+          : ('Delete "' + (cat?cat.name:id) + '"?');
+        if(!window.confirm(msg)) break;
+        if(filter === id) filter = "all";
+        deleteTestimonialCategory(id).then(function(){
+          showToast("Category deleted");
+        }).catch(function(e){
+          showToast("Could not delete: " + (e && e.message ? e.message : "please try again"), true);
+        });
+        break;
+      }
+      case "add-category": {
+        const newName = ((modal && modal.draft && modal.draft.newName) || "").trim();
+        if(!newName){ showToast("Please type a category name first", true); break; }
+        addTestimonialCategory(newName).then(function(){
+          if(modal && modal.draft) modal.draft.newName = "";
+          showToast("Category added");
+          render();
+        }).catch(function(e){
+          showToast("Could not add: " + (e && e.message ? e.message : "please try again"), true);
+        });
+        break;
+      }
       case "submit-admin-password":
         var pwInput = root.querySelector("#tstAdminPwInput");
         var val = pwInput ? pwInput.value : "";
