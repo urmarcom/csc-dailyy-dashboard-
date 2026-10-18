@@ -6126,16 +6126,38 @@ html[data-theme="dark"] #app-testimonial{
     tstLoadChunkedFile(photo.id, photo.chunkCount).then(function(dataUrl){
       if(!dataUrl) throw new Error("The HD file is missing or incomplete");
       const blob = dataURLToBlob(dataUrl);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = photo.fileName || "testimonial-photo";
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
-      showToast("Downloaded in full HD quality");
+      const fileName = photo.fileName || "testimonial-photo";
+      // Mobile browsers (especially iPhone Safari) largely ignore the <a download>
+      // trick below and just open the image instead of saving it. Where the native
+      // Share Sheet is available, use it — it lets the user tap "Save Image" to
+      // put the HD photo straight into their phone's photo gallery.
+      if(navigator.canShare && typeof File !== "undefined"){
+        let shareFile;
+        try{ shareFile = new File([blob], fileName, { type: blob.type || "application/octet-stream" }); }catch(mkErr){ shareFile = null; }
+        if(shareFile && navigator.canShare({ files: [shareFile] })){
+          navigator.share({ files: [shareFile] }).then(function(){
+            showToast("Choose \"Save Image\" to add it to your photos");
+          }).catch(function(shareErr){
+            if(shareErr && shareErr.name === "AbortError") return; // user cancelled the share sheet
+            console.warn("Share Sheet failed, falling back to direct download", shareErr);
+            triggerBrowserDownload(blob, fileName);
+          });
+          return;
+        }
+      }
+      triggerBrowserDownload(blob, fileName);
     }).catch(function(e){
       console.warn("HD download failed", e);
       showToast("Download failed: " + (e && e.message ? e.message : "please check your connection and try again"), true);
     });
+  }
+  function triggerBrowserDownload(blob, fileName){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = fileName;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+    showToast("Downloaded in full HD quality");
   }
 
   /* ============================= RENDER ============================= */
