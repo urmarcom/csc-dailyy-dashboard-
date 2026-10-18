@@ -794,6 +794,14 @@ html[data-theme="dark"] #app-followup{
 .hub-switch-btn.active{ background:#fff; color:#14171A; }
 .hub-pane{ display:none; }
 .hub-pane.active{ display:block; }
+@media (max-width:880px){
+  /* The tab row no longer fits on a phone screen once there are this many
+     hubs — let it scroll horizontally instead of silently clipping tabs
+     (like New Leads) off the edge where they can't be tapped at all. */
+  .hub-switcher{ overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+  .hub-switcher::-webkit-scrollbar{ display:none; }
+  .hub-switch-btn{ flex:none; white-space:nowrap; }
+}
 </style>
 </head>
 <body>
@@ -801,6 +809,7 @@ html[data-theme="dark"] #app-followup{
   <button type="button" class="hub-switch-btn active" data-hub-switch="dashboard">📊 Performance Dashboard</button>
   <button type="button" class="hub-switch-btn" data-hub-switch="followup">💬 Follow Up Hub</button>
   <button type="button" class="hub-switch-btn" data-hub-switch="testimonial">🖼️ Testimonial</button>
+  <button type="button" class="hub-switch-btn" data-hub-switch="newleads">✨ New Leads</button>
   <button type="button" class="hub-switch-btn" data-hub-switch="callmap">🧭 会问会答 Map</button>
   <button type="button" class="hub-switch-btn" data-hub-switch="whiteboard">🗒️ Whiteboard</button>
   <button type="button" class="hub-switch-btn" data-hub-switch="meeting">📋 Meeting Minutes</button>
@@ -814,6 +823,9 @@ html[data-theme="dark"] #app-followup{
 </div>
 <div class="hub-pane" id="hub-pane-testimonial">
 <div id="app-testimonial"></div>
+</div>
+<div class="hub-pane" id="hub-pane-newleads">
+<div id="app-newleads"></div>
 </div>
 <div class="hub-pane" id="hub-pane-callmap">
 <div id="app-callmap"></div>
@@ -6603,6 +6615,914 @@ html[data-theme="dark"] #app-testimonial{
   render();
 })();
 </script>
+<!-- ============================================================
+     NEW LEADS COMMUNICATION PLAYBOOK — its own hub pane
+     (#app-newleads), completely separate from every other hub: own
+     scoped CSS, own IIFE/state, own click dispatcher (data-nl-action,
+     never data-action/data-tst-action/etc, so it can never collide
+     with any other hub's dispatcher). Mostly static training content
+     rendered client-side; the one piece of real content that needed
+     an editable, non-fabricated source — the "三剑客" value pillar —
+     is synced through Firestore (same reused "followup" Firebase
+     project as Follow Up Hub / Testimonial), editable only in Admin
+     Mode, defaulting to an honest placeholder instead of invented
+     company copy. Admin unlock reuses the same ADMIN_PASSWORD /
+     "csc_admin_unlocked" session key as every other hub, so unlocking
+     once anywhere carries over here too.
+     ============================================================ -->
+<style>
+#app-newleads{
+    --bg:#F6F5FC; --surface:#FFFFFF; --surface-2:#EFEDFA; --border:#E2DEF4; --border-soft:#ECE9F8;
+    --ink:#1C1A2E; --ink-2:#5C5878; --ink-3:#928EB2;
+    --accent:#5B4FE0; --accent-2:#4038B0; --accent-soft:#EAE7FB; --accent-soft-ink:#4A3FC9;
+    --gold:#C8912E; --gold-soft:#FBF1DD; --gold-soft-ink:#8A6418;
+    --danger:#C0463D; --danger-bg:#FBEAE8; --danger-border:#F0CBC7;
+    --success:#2E8B57; --success-bg:#E7F5EC; --success-border:#C9E8D4;
+    --shadow-sm:0 1px 2px rgba(28,26,46,0.06); --shadow-md:0 6px 20px rgba(28,26,46,0.08); --shadow-lg:0 24px 70px rgba(28,26,46,0.22);
+    --radius:16px; --radius-sm:10px;
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    font-size:14.5px;line-height:1.6;min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+@media (prefers-color-scheme: dark){
+html:not([data-theme="light"]) #app-newleads{
+    --bg:#17152A; --surface:#1F1C36; --surface-2:#262242; --border:#342E53; --border-soft:#2B2645;
+    --ink:#EEEDFA; --ink-2:#B3AFD4; --ink-3:#7A76A0;
+    --accent:#8B7FFF; --accent-2:#A79BFF; --accent-soft:#2A2550; --accent-soft-ink:#C3BAFF;
+    --gold:#E0B559; --gold-soft:#332A14; --gold-soft-ink:#F0CE86;
+    --danger:#E6897E; --danger-bg:#3A211E; --danger-border:#5C332C;
+    --success:#6FCB91; --success-bg:#1C3024; --success-border:#2C4A38;
+  }}
+html[data-theme="dark"] #app-newleads{
+    --bg:#17152A; --surface:#1F1C36; --surface-2:#262242; --border:#342E53; --border-soft:#2B2645;
+    --ink:#EEEDFA; --ink-2:#B3AFD4; --ink-3:#7A76A0;
+    --accent:#8B7FFF; --accent-2:#A79BFF; --accent-soft:#2A2550; --accent-soft-ink:#C3BAFF;
+    --gold:#E0B559; --gold-soft:#332A14; --gold-soft-ink:#F0CE86;
+    --danger:#E6897E; --danger-bg:#3A211E; --danger-border:#5C332C;
+    --success:#6FCB91; --success-bg:#1C3024; --success-border:#2C4A38;
+  }
+#app-newleads h1, #app-newleads h2, #app-newleads h3, #app-newleads h4{
+    font-family:"Fraunces",Georgia,"Times New Roman",serif; font-weight:600; letter-spacing:-0.01em; color:var(--ink); margin:0;
+  }
+#app-newleads button{font-family:inherit;}
+#app-newleads .icon{width:16px;height:16px;flex:none;display:block;}
+#app-newleads svg{overflow:visible;}
+#app-newleads .app-header{
+    position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:18px;padding:13px 24px;
+    background:color-mix(in srgb, var(--surface) 92%, transparent);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border-soft);
+  }
+#app-newleads .brand{display:flex;align-items:center;gap:9px;flex:none;}
+#app-newleads .brand-mark{
+    width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:16px;flex:none;
+  }
+#app-newleads .brand-name{font-family:"Fraunces",serif;font-weight:600;font-size:16px;white-space:nowrap;}
+#app-newleads .header-right{display:flex;align-items:center;gap:12px;margin-left:auto;flex:none;flex-wrap:wrap;}
+#app-newleads .mode-toggle{display:flex;padding:3px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);flex:none;}
+#app-newleads .mode-toggle button{
+    border:none;background:none;padding:6px 13px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--ink-2);
+    cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;
+  }
+#app-newleads .mode-toggle button.active{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-sm);}
+#app-newleads .mode-toggle button.active.admin-active{background:var(--accent);color:#fff;}
+#app-newleads .admin-banner{
+    background:var(--accent-soft);color:var(--accent-soft-ink);font-size:12.5px;padding:8px 24px;
+    display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border-soft);
+  }
+#app-newleads .nl-wrap{max-width:1180px;margin:0 auto;padding:0 24px 100px;}
+
+/* ---------- Hero ---------- */
+#app-newleads .nl-hero{
+    background:linear-gradient(135deg,var(--accent) 0%,var(--accent-2) 100%);color:#fff;
+    border-radius:0 0 28px 28px;padding:40px 24px 34px;margin:0 0 32px;
+  }
+#app-newleads .nl-hero-inner{max-width:1132px;margin:0 auto;}
+#app-newleads .nl-hero-eyebrow{
+    display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.16);border-radius:999px;
+    padding:5px 13px;font-size:11.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;margin-bottom:14px;
+  }
+#app-newleads .nl-hero h1{color:#fff;font-size:30px;margin-bottom:10px;}
+#app-newleads .nl-hero p{color:rgba(255,255,255,.86);font-size:14.5px;max-width:640px;margin:0;}
+#app-newleads .nl-principle-row{
+    display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:24px;
+  }
+#app-newleads .nl-principle-chip{
+    background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:10px;
+    padding:9px 13px;font-size:12.5px;font-weight:600;color:#fff;white-space:nowrap;
+  }
+#app-newleads .nl-principle-arrow{color:rgba(255,255,255,.5);flex:none;}
+#app-newleads .nl-core-caps{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;}
+#app-newleads .nl-core-cap{
+    display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);
+    border-radius:10px;padding:8px 14px;font-size:12.5px;color:#fff;
+  }
+#app-newleads .nl-core-cap b{font-family:"Fraunces",serif;font-size:14px;}
+
+/* ---------- Section shell ---------- */
+#app-newleads .nl-section{margin-bottom:36px;}
+#app-newleads .nl-section-head{margin-bottom:16px;}
+#app-newleads .nl-section-head .nl-eyebrow{
+    font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);margin-bottom:4px;
+  }
+#app-newleads .nl-section-head h2{font-size:21px;}
+#app-newleads .nl-section-head p{color:var(--ink-2);font-size:13px;margin-top:4px;}
+
+/* ---------- 3 skills (roof) ---------- */
+#app-newleads .nl-skills-band{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:22px 22px 14px;box-shadow:var(--shadow-sm);
+  }
+#app-newleads .nl-skills-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+#app-newleads .nl-skill-card{
+    background:var(--surface-2);border:1px solid var(--border-soft);border-radius:var(--radius-sm);
+    padding:16px;display:flex;flex-direction:column;gap:8px;
+  }
+#app-newleads .nl-skill-icon{
+    width:36px;height:36px;border-radius:10px;background:var(--accent-soft);color:var(--accent-soft-ink);
+    display:flex;align-items:center;justify-content:center;flex:none;
+  }
+#app-newleads .nl-skill-card h3{font-size:15.5px;}
+#app-newleads .nl-skill-card .nl-skill-en{font-size:11px;color:var(--ink-3);font-weight:600;letter-spacing:.02em;}
+#app-newleads .nl-skill-card p{font-size:12.5px;color:var(--ink-2);margin:0;}
+#app-newleads .nl-skills-connector{
+    display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 0 2px;color:var(--ink-3);font-size:11px;font-weight:600;
+  }
+#app-newleads .nl-skills-connector .line{width:1px;height:16px;background:var(--border);}
+
+/* ---------- Step accordion ---------- */
+#app-newleads .nl-steps{display:flex;flex-direction:column;gap:14px;}
+#app-newleads .nl-step{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-sm);overflow:hidden;
+  }
+#app-newleads .nl-step-head{
+    display:flex;align-items:center;gap:16px;padding:18px 20px;cursor:pointer;user-select:none;
+  }
+#app-newleads .nl-step-no{
+    width:42px;height:42px;border-radius:12px;background:var(--accent-soft);color:var(--accent-soft-ink);
+    display:flex;align-items:center;justify-content:center;font-family:"Fraunces",serif;font-weight:600;font-size:16px;flex:none;
+  }
+#app-newleads .nl-step-head-text{flex:1;min-width:0;}
+#app-newleads .nl-step-head-text .nl-step-kicker{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);}
+#app-newleads .nl-step-head-text h3{font-size:17px;margin-top:2px;}
+#app-newleads .nl-step-head-text .nl-step-teaser{font-size:12.5px;color:var(--ink-2);margin-top:3px;}
+#app-newleads .nl-step-chevron{color:var(--ink-3);flex:none;transition:transform .2s;}
+#app-newleads .nl-step.expanded .nl-step-chevron{transform:rotate(180deg);}
+#app-newleads .nl-step-body{padding:0 22px 24px;display:none;}
+#app-newleads .nl-step.expanded .nl-step-body{display:block;}
+#app-newleads .nl-step-goals{
+    background:var(--surface-2);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:18px;
+  }
+#app-newleads .nl-step-goals-title{font-size:12px;font-weight:700;color:var(--ink-2);margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+#app-newleads .nl-step-goals ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;}
+#app-newleads .nl-step-goals li{font-size:13px;color:var(--ink);display:flex;gap:8px;align-items:flex-start;}
+#app-newleads .nl-step-goals li .icon{color:var(--accent);margin-top:2px;}
+#app-newleads .nl-subhead{font-size:13px;font-weight:700;color:var(--ink);margin:0 0 10px;display:flex;align-items:center;gap:7px;}
+
+/* ABCDE grid */
+#app-newleads .nl-abcde-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px;}
+#app-newleads .nl-abcde-card{
+    border:1px solid var(--border-soft);border-radius:var(--radius-sm);padding:13px 12px;background:var(--surface);
+  }
+#app-newleads .nl-abcde-letter{
+    width:30px;height:30px;border-radius:8px;background:var(--accent);color:#fff;font-family:"Fraunces",serif;font-weight:600;
+    display:flex;align-items:center;justify-content:center;font-size:15px;margin-bottom:8px;
+  }
+#app-newleads .nl-abcde-card h4{font-size:12.5px;margin-bottom:4px;}
+#app-newleads .nl-abcde-card .nl-abcde-en{font-size:10.5px;color:var(--ink-3);font-weight:600;}
+#app-newleads .nl-abcde-card p{font-size:11.5px;color:var(--ink-2);margin:6px 0 0;}
+#app-newleads .nl-callout{
+    border-radius:var(--radius-sm);padding:14px 16px;font-size:12.5px;line-height:1.6;margin-bottom:16px;border:1px solid;
+  }
+#app-newleads .nl-callout.warn{background:var(--gold-soft);color:var(--gold-soft-ink);border-color:#EBD79E;}
+#app-newleads .nl-callout.info{background:var(--accent-soft);color:var(--accent-soft-ink);border-color:#D6D0F7;}
+#app-newleads .nl-callout-title{font-weight:700;margin-bottom:5px;display:flex;align-items:center;gap:6px;}
+#app-newleads .nl-example-box{
+    background:var(--surface-2);border-radius:var(--radius-sm);padding:14px 16px;
+  }
+#app-newleads .nl-example-box ul{margin:8px 0 0;padding-left:18px;}
+#app-newleads .nl-example-box li{font-size:12.5px;color:var(--ink);margin-bottom:5px;}
+
+/* flow diagram (step 2) */
+#app-newleads .nl-flow-row{display:flex;align-items:stretch;gap:0;margin-bottom:16px;flex-wrap:wrap;}
+#app-newleads .nl-flow-node{
+    flex:1;min-width:150px;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:var(--radius-sm);
+    padding:13px 14px;
+  }
+#app-newleads .nl-flow-node .nl-flow-no{font-size:10.5px;font-weight:700;color:var(--accent);letter-spacing:.03em;}
+#app-newleads .nl-flow-node h4{font-size:13px;margin:4px 0 5px;}
+#app-newleads .nl-flow-node p{font-size:11.5px;color:var(--ink-2);margin:0;}
+#app-newleads .nl-flow-arrow{display:flex;align-items:center;justify-content:center;flex:none;width:28px;color:var(--ink-3);}
+#app-newleads .nl-dig-demo{
+    background:var(--surface-2);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:16px;
+  }
+#app-newleads .nl-dig-quote{
+    font-size:13px;font-style:italic;color:var(--ink);background:var(--surface);border-left:3px solid var(--accent);
+    padding:8px 12px;border-radius:0 8px 8px 0;margin-bottom:10px;
+  }
+#app-newleads .nl-concern-need{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:6px;}
+#app-newleads .nl-cn-card{border-radius:var(--radius-sm);padding:14px 15px;border:1px solid;}
+#app-newleads .nl-cn-card.concern{background:var(--danger-bg);border-color:var(--danger-border);}
+#app-newleads .nl-cn-card.need{background:var(--success-bg);border-color:var(--success-border);}
+#app-newleads .nl-cn-card h4{font-size:13px;margin-bottom:5px;}
+#app-newleads .nl-cn-card.concern h4{color:var(--danger);}
+#app-newleads .nl-cn-card.need h4{color:var(--success);}
+#app-newleads .nl-cn-card p{font-size:12px;color:var(--ink-2);margin:0;}
+#app-newleads .nl-cn-caption{font-size:12px;color:var(--ink-2);text-align:center;margin-top:8px;}
+
+/* value cards (step 3) */
+#app-newleads .nl-value-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+#app-newleads .nl-value-card{
+    border:1px solid var(--border-soft);border-radius:var(--radius-sm);background:var(--surface);overflow:hidden;
+  }
+#app-newleads .nl-value-head{
+    display:flex;align-items:center;gap:11px;padding:13px 14px;cursor:pointer;user-select:none;
+  }
+#app-newleads .nl-value-icon{
+    width:34px;height:34px;border-radius:9px;background:var(--accent-soft);color:var(--accent-soft-ink);
+    display:flex;align-items:center;justify-content:center;flex:none;
+  }
+#app-newleads .nl-value-head h4{font-size:13.5px;flex:1;}
+#app-newleads .nl-value-chevron{color:var(--ink-3);flex:none;transition:transform .2s;}
+#app-newleads .nl-value-card.expanded .nl-value-chevron{transform:rotate(180deg);}
+#app-newleads .nl-value-body{display:none;padding:0 14px 14px;}
+#app-newleads .nl-value-card.expanded .nl-value-body{display:block;}
+#app-newleads .nl-value-row{margin-bottom:9px;}
+#app-newleads .nl-value-row b{font-size:11.5px;color:var(--accent);display:block;margin-bottom:2px;}
+#app-newleads .nl-value-row span{font-size:12.5px;color:var(--ink-2);}
+#app-newleads .nl-value-example{
+    background:var(--surface-2);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--ink);font-style:italic;
+  }
+#app-newleads .nl-threeswords-edit-btn{margin-left:auto;flex:none;}
+#app-newleads .nl-threeswords-textarea{
+    width:100%;min-height:110px;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);
+    color:var(--ink);font-size:12.5px;font-family:inherit;outline:none;resize:vertical;margin-bottom:8px;
+  }
+#app-newleads .nl-threeswords-textarea:focus{border-color:var(--accent);}
+#app-newleads .nl-threeswords-placeholder{color:var(--ink-3);font-style:italic;}
+#app-newleads .nl-threeswords-actions{display:flex;gap:8px;}
+
+/* closing (step 4) */
+#app-newleads .nl-closing-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
+#app-newleads .nl-closing-node{
+    background:var(--surface-2);border:1px solid var(--border-soft);border-radius:var(--radius-sm);padding:12px 13px;position:relative;
+  }
+#app-newleads .nl-closing-node .nl-flow-no{font-size:10.5px;font-weight:700;color:var(--accent);}
+#app-newleads .nl-closing-node h4{font-size:12.5px;margin:4px 0 4px;}
+#app-newleads .nl-closing-node p{font-size:11px;color:var(--ink-2);margin:0;}
+#app-newleads .nl-closing-scenarios{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
+#app-newleads .nl-chip{
+    border:1px solid var(--border);background:var(--surface);color:var(--ink-2);border-radius:999px;
+    padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;
+  }
+#app-newleads .nl-chip.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+#app-newleads .nl-closing-result{
+    background:var(--accent-soft);color:var(--accent-soft-ink);border-radius:var(--radius-sm);padding:14px 16px;font-size:13px;line-height:1.6;
+  }
+#app-newleads .nl-closing-note{font-size:12px;color:var(--ink-2);text-align:center;margin-top:12px;}
+
+/* scenario simulator */
+#app-newleads .nl-sim-card{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-sm);padding:22px;
+  }
+#app-newleads .nl-sim-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
+#app-newleads .nl-sim-result{background:var(--surface-2);border-radius:var(--radius-sm);padding:16px 18px;}
+#app-newleads .nl-sim-quote{
+    font-size:14.5px;font-style:italic;color:var(--ink);background:var(--surface);border-left:3px solid var(--gold);
+    padding:10px 14px;border-radius:0 8px 8px 0;margin-bottom:14px;
+  }
+#app-newleads .nl-sim-rows{display:flex;flex-direction:column;gap:10px;}
+#app-newleads .nl-sim-row{display:flex;gap:10px;}
+#app-newleads .nl-sim-row .nl-sim-tag{
+    flex:none;width:92px;font-size:11px;font-weight:700;color:var(--accent);padding-top:1px;
+  }
+#app-newleads .nl-sim-row p{margin:0;font-size:12.5px;color:var(--ink-2);flex:1;}
+
+/* mistakes */
+#app-newleads .nl-mistakes-grid{display:flex;flex-direction:column;gap:10px;}
+#app-newleads .nl-mistake-row{
+    display:grid;grid-template-columns:1fr 1fr;gap:10px;
+  }
+#app-newleads .nl-mistake-card{border-radius:var(--radius-sm);padding:13px 15px;border:1px solid;display:flex;gap:10px;align-items:flex-start;}
+#app-newleads .nl-mistake-card.bad{background:var(--danger-bg);border-color:var(--danger-border);}
+#app-newleads .nl-mistake-card.good{background:var(--success-bg);border-color:var(--success-border);}
+#app-newleads .nl-mistake-card .icon{flex:none;margin-top:1px;}
+#app-newleads .nl-mistake-card.bad .icon{color:var(--danger);}
+#app-newleads .nl-mistake-card.good .icon{color:var(--success);}
+#app-newleads .nl-mistake-card p{margin:0;font-size:12.5px;color:var(--ink);line-height:1.5;}
+
+/* footer */
+#app-newleads .nl-footer{
+    text-align:center;padding:30px 20px 10px;color:var(--ink-2);
+  }
+#app-newleads .nl-footer .nl-footer-tagline{font-family:"Fraunces",serif;font-size:19px;color:var(--ink);margin-bottom:6px;}
+#app-newleads .nl-footer .nl-footer-sub{font-size:12.5px;}
+
+/* shared btn / overlay / toast (mirrors other hubs' patterns, scoped here) */
+#app-newleads .btn{
+    display:inline-flex;align-items:center;gap:7px;padding:8px 15px;border-radius:9px;font-size:13px;font-weight:600;
+    cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--ink);white-space:nowrap;
+  }
+#app-newleads .btn:hover{background:var(--surface-2);}
+#app-newleads .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+#app-newleads .btn-primary:hover{background:var(--accent-2);border-color:var(--accent-2);}
+#app-newleads .btn-sm{padding:6px 12px;font-size:12px;}
+#app-newleads .overlay{
+    position:fixed;inset:0;background:rgba(20,17,38,0.5);display:flex;align-items:flex-start;justify-content:center;
+    z-index:100;padding:5vh 20px;overflow-y:auto;
+  }
+#app-newleads .modal{
+    background:var(--surface);border-radius:16px;box-shadow:var(--shadow-lg);width:100%;max-width:420px;
+    padding:26px 26px 22px;margin-bottom:5vh;
+  }
+#app-newleads .modal h2{font-size:18px;margin-bottom:4px;}
+#app-newleads .modal .modal-sub{color:var(--ink-2);font-size:12.5px;margin-bottom:16px;}
+#app-newleads .field{margin-bottom:14px;}
+#app-newleads .field label{display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:6px;}
+#app-newleads .field input[type=password]{
+    width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);
+    color:var(--ink);font-size:13.5px;font-family:inherit;outline:none;
+  }
+#app-newleads .field input:focus{border-color:var(--accent);}
+#app-newleads .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}
+#app-newleads .toast{
+    position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);
+    padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:120;box-shadow:var(--shadow-lg);
+    display:flex;align-items:center;gap:8px;max-width:min(90vw,420px);
+  }
+#app-newleads .toast-error{background:var(--danger);color:#fff;}
+
+@media (max-width:880px){
+  #app-newleads .app-header{flex-wrap:wrap;padding:12px 16px;}
+  #app-newleads .nl-wrap{padding:0 14px 80px;}
+  #app-newleads .nl-hero{padding:30px 16px 26px;border-radius:0 0 20px 20px;}
+  #app-newleads .nl-hero h1{font-size:23px;}
+  #app-newleads .nl-skills-grid{grid-template-columns:1fr;}
+  #app-newleads .nl-abcde-grid{grid-template-columns:repeat(2,1fr);}
+  #app-newleads .nl-value-grid{grid-template-columns:1fr;}
+  #app-newleads .nl-closing-grid{grid-template-columns:repeat(2,1fr);}
+  #app-newleads .nl-concern-need{grid-template-columns:1fr;}
+  #app-newleads .nl-mistake-row{grid-template-columns:1fr;}
+  #app-newleads .nl-flow-row{flex-direction:column;}
+  #app-newleads .nl-flow-arrow{transform:rotate(90deg);width:100%;height:20px;}
+  #app-newleads .modal{padding:20px 18px 18px;}
+}
+@media (max-width:480px){
+  #app-newleads .nl-abcde-grid{grid-template-columns:1fr;}
+  #app-newleads .nl-closing-grid{grid-template-columns:1fr;}
+  #app-newleads .nl-principle-row{flex-direction:column;align-items:stretch;}
+  #app-newleads .nl-principle-arrow{display:none;}
+}
+</style>
+<script>
+(function(){
+  "use strict";
+
+  const ICONS = {
+    sparkle:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg>',
+    chevronDown:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9.5 12 15.5 18 9.5"/></svg>',
+    question:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 9a3 3 0 1 1 4.5 2.6c-.9.5-1.5 1-1.5 2.1"/><circle cx="12" cy="17.5" r=".4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="9"/></svg>',
+    heart:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.3S4 15.4 4 9.9A4.4 4.4 0 0 1 12 7a4.4 4.4 0 0 1 8 2.9c0 5.5-8 10.4-8 10.4z"/></svg>',
+    sun:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="4.3"/><path d="M12 2.5v2.4M12 19.1v2.4M4.2 4.2l1.7 1.7M18.1 18.1l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.2 19.8l1.7-1.7M18.1 5.9l1.7-1.7"/></svg>',
+    check:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12.5 9.5 18 20 6"/></svg>',
+    dot:'<svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="4"/></svg>',
+    arrowRight:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>',
+    shield:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l7 2.6v5.4c0 4.6-3 8.1-7 9-4-.9-7-4.4-7-9V6.1z"/></svg>',
+    userIcon:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.3" r="3.3"/><path d="M5 19.5c1.3-3.3 4-5 7-5s5.7 1.7 7 5"/></svg>',
+    x:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>',
+    pencil:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l.9-3.9L16.6 4.4a1.8 1.8 0 0 1 2.5 0l1 1a1.8 1.8 0 0 1 0 2.5L8.4 19.6z"/><path d="M14.5 6.5l3.5 3.5"/></svg>',
+    target:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".6" fill="currentColor" stroke="none"/></svg>',
+    alertTriangle:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.2L21 19.5H3z"/><line x1="12" y1="10" x2="12" y2="14.3"/><circle cx="12" cy="16.9" r=".4" fill="currentColor" stroke="none"/></svg>',
+  };
+
+  /* ============================= CONTENT DATA ============================= */
+  const PRINCIPLE_CHIPS = ["Information","Understand Customer","Discover Needs","Deliver Relevant Value","Closing"];
+
+  const SKILLS = [
+    { icon:"question", en:"Strategic Questioning", cn:"反问", desc:"根据顾客的回答，提出有意义的问题，让顾客自己意识到问题和需求——不是为了问而问。" },
+    { icon:"heart", en:"Genuine Appreciation", cn:"赞美", desc:"根据顾客真实的行为、选择或努力，给予自然真诚的肯定。不是每句话都夸，也不做虚假的赞美。" },
+    { icon:"sun", en:"Create Hope", cn:"给希望", desc:"让顾客知道皮肤问题可以透过专业评估找到合适的改善方向——给合理的希望，不是承诺一定完全祛斑。" },
+  ];
+
+  const ABCDEF = [
+    { letter:"A", en:"Melasma", cn:"黄褐斑", desc:"顾客常形容成「大片、两边脸颊/太阳穴/额头对称出现、颜色偏灰棕色、边缘比较模糊」的斑，很多跟荷尔蒙、怀孕、长期晒太阳有关。" },
+    { letter:"B", en:"ABNOM", cn:"ABNOM", desc:"顾客常形容成「两边脸颊、眼下或鼻梁一颗颗、灰蓝色或灰褐色的小斑点」，颜色通常比黄褐斑更深、更明显。" },
+    { letter:"C", en:"Age Spot", cn:"老人斑 / 晒斑", desc:"顾客常形容成「脸上或手背咖啡色的斑点，边缘比较清楚」，通常跟长期晒太阳或年纪有关。" },
+    { letter:"D", en:"Freckles", cn:"雀斑", desc:"顾客常形容成「很小颗、分布在鼻子和脸颊两侧的浅棕色斑点」，很多从小就有，晒太阳后会变明显。" },
+    { letter:"E", en:"Uneven Skin Tone", cn:"肤色不均", desc:"顾客常形容成「整体肤色看起来不均匀、有些部位比较暗沉」，但不一定有明显一颗一颗的斑点。" },
+    { letter:"F", en:"Acne", cn:"痘痘 / 痘疤", desc:"顾客常形容成「反复长痘痘」，或者「痘痘好了之后留下的红印、黑色素沉淀」。" },
+  ];
+
+  const STEP1_GOALS = [
+    "了解顾客的斑在哪里、大概多久了",
+    "留意斑有没有变化（变大、变深、反复出现）",
+    "收集足够的资讯，而不是急着跳去介绍疗程",
+    "留意顾客话里透露的线索（Clue），为下一步做准备",
+  ];
+  const STEP1_EXAMPLES = [
+    "方便跟我说说，这个斑大概是什么时候开始有的吗？",
+    "这段时间有没有觉得它越来越明显，或者反而变淡了？",
+    "斑主要集中在哪个位置比较多呢？",
+  ];
+
+  const STEP2_FLOW = [
+    { no:"01", en:"Diagnosis", cn:"是否诊断过", desc:"顾客有没有给医生看过？知道自己的斑属于哪一种类型吗？" },
+    { no:"02", en:"Current Condition", cn:"现在状况", desc:"现在脸上的斑和皮肤状况怎样？有没有越来越明显、反复出现，或其他困扰？" },
+    { no:"03", en:"Treatment History", cn:"治疗记录", desc:"以前有没有做过治疗？效果怎样？有没有反黑、复发？" },
+    { no:"04", en:"Real Needs", cn:"真正需求", desc:"为什么是现在想改善？真正不满意的是什么？心里有什么担忧？" },
+  ];
+
+  const STEP4_FLOW = [
+    { no:"01", en:"Summarize Need", cn:"总结需求", desc:"把顾客提到的需求简单重复一次，让她感觉『你真的有在听、有理解』。" },
+    { no:"02", en:"Reinforce Value", cn:"强化价值", desc:"解释为什么这个状况值得来做医生评估，结合前面带出的价值点。" },
+    { no:"03", en:"Recommend Next Step", cn:"建议下一步", desc:"建议到诊所做Skin Analysis跟医生咨询，而不是含糊地说『欢迎过来看看』。" },
+    { no:"04", en:"Confirm Appointment", cn:"确认预约", desc:"自然、主动地提出具体日期和时间，而不是等顾客自己说『我再想想』。" },
+  ];
+
+  const VALUE_CARDS = [
+    {
+      id:"ai-analysis", en:"AI Skin Analysis", icon:"target",
+      what:"透过仪器针对顾客皮肤做深层分析，呈现肉眼看不到的状况（比如色素深度、分布）。",
+      when:"顾客觉得自己『看起来还好』，或者对斑的严重程度没有概念的时候。",
+      value:"帮助顾客理解为什么不能只靠肉眼判断皮肤状况，为什么需要医生进一步评估。",
+      example:"其实很多斑用肉眼是看不出深浅的，我们可以透过仪器分析，让医生更清楚看到你皮肤实际的状况，评估会更准确。",
+    },
+    {
+      id:"testimonial", en:"Testimonial / Before & After", icon:"heart",
+      what:"真实顾客的案例照片和改善过程。",
+      when:"顾客对『这真的有效吗』『适合我吗』感到犹豫的时候。",
+      value:"透过真实案例建立信任，说明改善的可能性，但不保证每个人都获得相同效果。",
+      example:"我给你看几个跟你情况类似的顾客案例，当然每个人肤质不同、效果也会不一样，但至少可以给你一个参考。",
+    },
+    {
+      id:"edu-images", en:"Educational Pigmentation Images", icon:"sun",
+      what:"解释 pigmentation、皮肤发炎、皮肤屏障等相关知识的卫教资料。",
+      when:"顾客对自己的斑、皮肤状况不太了解，或者有一些似是而非的观念的时候。",
+      value:"让顾客更理解自己的皮肤发生了什么事，而不只是『想祛斑』却不知道为什么。",
+      example:"其实斑的形成跟皮肤屏障也有关系，我这边有一些资料可以给你看看，等一下跟医生聊的时候也会更清楚要问什么。",
+    },
+  ];
+
+  const CLOSING_SCENARIOS = [
+    { label:"有兴趣但迟迟没预约", tip:"可能是缺少临门一脚——主动提出具体时间，而不是开放式地问「你方便吗」。例如：「那我帮你看看，这个星期六或下星期三，哪一天比较方便？」" },
+    { label:"担心效果", tip:"回到Testimonial和AI Analysis，强调医生会根据她实际的皮肤状况做评估和建议，而不是一套固定流程。给合理希望，不过度承诺。" },
+    { label:"担心价格", tip:"不要急着报价或打折，先确认清楚她的疑虑是『预算』还是『值不值得』，再说明评估后医生会依个人状况给方案建议。" },
+    { label:"想再考虑", tip:"不强推，了解清楚『考虑』背后真正的原因（没空／没信心／想问价钱），针对那个原因回应，再建议一个没有压力的下一步，比如先约免费Skin Analysis。" },
+    { label:"一直问Treatment但没有明确需求", tip:"温和地把话题拉回Step 1-2，先了解她的斑和需求，再回答治疗细节，避免变成单方面讲解Treatment内容。" },
+  ];
+
+  const SCENARIOS = [
+    {
+      quote:"我之前做过 Laser，但没什么效果。",
+      need:"追问做了什么治疗、多久前、有没有反黑复发，找出她现在真正想要的是「更适合自己肤质」还是「更持久的效果」。",
+      value:"AI Skin Analysis（找出之前没被处理到的问题）+ Testimonial（类似案例参考）。",
+      closing:"总结她想要「更适合自己肤质的方案」，建议先做评估，再由医生判断适合的方向。",
+    },
+    {
+      quote:"这个会不会很贵？",
+      need:"先别急着报价，反问「你会担心贵，是比较在意预算，还是想知道这样值不值得？」找出真正的顾虑。",
+      value:"Testimonial——让她看到实际效果，建立「值得」的感觉。",
+      closing:"说明价格会依个人评估结果而不同，建议先约诊让医生评估，再给具体方案。",
+    },
+    {
+      quote:"我要考虑一下。",
+      need:"反问「方便说说是哪一部分让你会想再考虑一下吗？」找出真正卡住的点。",
+      value:"视卡住的点而定——没信心用Testimonial，没时间概念用AI Analysis说明（但不夸大）。",
+      closing:"不施压，建议一个低门槛的下一步，比如先预约免费Skin Analysis，而不是直接约治疗。",
+    },
+    {
+      quote:"这个安全吗？会不会反黑？",
+      need:"这是一个Concern，往下问她是不是之前有过不好的经验，找出背后的Need（比如「怕再次失败」）。",
+      value:"Educational Images（说明专业评估跟正确疗程规划的重要）+ 强调由医生主导评估。",
+      closing:"说明医生会依照她的肤质做评估，降低风险的方式就是先给医生专业判断，再决定方案。",
+    },
+    {
+      quote:"我只是想问问价钱而已。",
+      need:"先简单回应，但顺势反问「方便先了解一下，你主要是想改善哪方面呢？」把话题带回需求。",
+      value:"视挖出的需求而定，再挑最相关的工具说明。",
+      closing:"说明价格会因个人状况不同，建议先约一个评估，让医生看了之后给实际的方案和价格。",
+    },
+    {
+      quote:"我朋友说她做了效果很好。",
+      need:"先肯定她有做功课、了解朋友的经验，再问「那你自己呢？最想改善的是哪个部分？」避免她只是因为朋友说好而来。",
+      value:"Testimonial（多几个案例，说明效果因人而异）+ AI Analysis（针对她自己的状况）。",
+      closing:"强调朋友的经验值得参考，但适合她自己的方案需要医生针对她的皮肤评估，建议约诊。",
+    },
+  ];
+
+  const MISTAKES = [
+    { bad:"太快介绍 Treatment 或 Promo", good:"先花时间了解顾客的斑和需求，再谈方案" },
+    { bad:"问完一轮问题就结束，没有深入", good:"顺着顾客的回答继续往下挖，找出真正的 Need" },
+    { bad:"一次把 AI Analysis、Testimonial、卫教资料全部发出去", good:"根据找到的需求，挑 1-2 个最相关的工具说明" },
+    { bad:"没有回应顾客真正的 Concern，直接往下讲", good:"先处理好顾虑，顾客才会愿意听你说价值" },
+    { bad:"讲完价值就停住，等顾客自己决定", good:"总结需求、强化价值后，主动提出具体时间约诊" },
+  ];
+
+  // Official 三剑客 definition (from clinic's own marketing material) — used
+  // only to SEED the Firestore doc the first time it's empty, never to
+  // overwrite an Admin's later edits. Admin can still rewrite it anytime
+  // through the edit button; this just means CSC don't open to a blank
+  // placeholder anymore now that the real content exists.
+  const DEFAULT_THREE_SWORDS_TEXT =
+"误区一：只处理冰山一角\n" +
+"看得到的色斑，只是冰山一角。表面之下其实是慢性发炎、异常微细血管、屏障受损、真皮层老化这些问题，在持续制造新的色斑——你过去一直在倒垃圾，却没有解决为什么会不断产生垃圾。\n" +
+"➜ 我们的价值：修复生态圈。不只处理看得到的斑，而是从根本修复皮肤生态圈。\n" +
+"\n" +
+"误区二：用一种方式解决所有层次\n" +
+"不同层次的色素，需要不同波长与不同模式——单一波长只能解决一部分问题；多波长＋多模式才能跨层次全面解决问题（表皮层、基底层、浅层真皮、深层真皮，层层都不一样）。\n" +
+"➜ 我们的价值：量身订制治疗。根据色素实际分布的层次，针对性地规划方案。\n" +
+"\n" +
+"误区三：用一次诊断结果，决定后面所有治疗\n" +
+"皮肤不是一个固定的点，而是一个不断变化的过程——压力、紫外线、荷尔蒙、生活习惯、年龄增长都会持续影响当下的皮肤状态。每一次精准诊断，才能带来每一次精准的治疗。\n" +
+"➜ 我们的价值：动态的 AI 皮肤检测。不是一次诊断定生死，而是每次都重新精准评估。";
+
+  /* ============================= STATE ============================= */
+  let db = null, useDb = false;
+  const ADMIN_PASSWORD = "agh030222";
+  let mode = "csc";
+  let adminUnlocked = false;
+  try{ adminUnlocked = sessionStorage.getItem("csc_admin_unlocked") === "1"; }catch(e){}
+  let expandedSteps = { step1:false, step2:false, step3:false, step4:false };
+  let expandedValueCard = null;
+  let activeScenario = 0;
+  let activeClosing = null;
+  let modal = null;
+  let threeSwordsText = "";
+  let threeSwordsEditing = false;
+  let threeSwordsDraft = "";
+  let toastMsg = null, toastIsError = false, toastTimer = null;
+
+  function showToast(msg, isError){
+    toastMsg = msg; toastIsError = !!isError;
+    render();
+    if(toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ toastMsg = null; render(); }, 3200);
+  }
+  function esc(s){
+    return String(s==null?"":s).replace(/[&<>"']/g, function(c){
+      return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c];
+    });
+  }
+
+  /* ============================= DB (three swords text only) ============================= */
+  try{
+    if(typeof firebase !== "undefined" && typeof FIREBASE_CONFIG_FOLLOWUP !== "undefined"){
+      const fuApp = firebase.apps.some(function(a){ return a.name === "followup"; })
+        ? firebase.app("followup")
+        : firebase.initializeApp(FIREBASE_CONFIG_FOLLOWUP, "followup");
+      db = fuApp.firestore();
+      useDb = true;
+      let threeSwordsSeedAttempted = false;
+      db.collection("newLeadsContent").doc("threeSwords").onSnapshot(function(snap){
+        if(snap.exists){
+          threeSwordsText = (snap.data()||{}).text || "";
+        } else {
+          // Nobody has saved anything here yet — seed the real, official
+          // content once instead of leaving CSC staring at a blank card.
+          if(!threeSwordsSeedAttempted){
+            threeSwordsSeedAttempted = true;
+            db.collection("newLeadsContent").doc("threeSwords").set({ text: DEFAULT_THREE_SWORDS_TEXT })
+              .catch(function(e){ console.warn("three swords seed failed", e); });
+          }
+          threeSwordsText = DEFAULT_THREE_SWORDS_TEXT;
+        }
+        render();
+      }, function(err){ console.warn("newLeadsContent sync error", err); });
+    }
+  }catch(e){
+    console.warn("New Leads Playbook: Firebase unavailable, 三剑客 edits stay local-only", e);
+  }
+
+  /* ============================= RENDER ============================= */
+  function adminBannerHtml(){
+    return mode === "admin"
+      ? '<div class="admin-banner">'+ICONS.shield+"<span>Admin Mode — 三剑客内容的编辑会同步给全team。切换回 CSC Mode 结束编辑。</span></div>"
+      : "";
+  }
+  function headerHtml(){
+    return '<div class="app-header"><div class="brand"><div class="brand-mark">'+ICONS.sparkle+'</div>' +
+      '<div class="brand-name">New Leads Playbook</div></div>' +
+      '<div class="header-right"><div class="mode-toggle">' +
+        '<button type="button" class="'+(mode==="csc"?"active":"")+'" data-nl-mode="csc">'+ICONS.userIcon+" CSC Mode</button>" +
+        '<button type="button" class="'+(mode==="admin"?"active admin-active":"")+'" data-nl-mode="admin">'+ICONS.shield+" Admin Mode</button>" +
+      "</div></div></div>";
+  }
+  function heroHtml(){
+    return '<div class="nl-hero"><div class="nl-hero-inner">' +
+      '<div class="nl-hero-eyebrow">'+ICONS.sparkle+' New Leads Communication Playbook</div>' +
+      "<h1>从认识顾客的斑，到自然引导预约</h1>" +
+      "<p>这不是一份要你死背的Sales Script。这是一张完整的沟通地图，训练你在面对New Lead的时候，知道现在该做什么、为什么要这样做，一步步建立信任、引导预约。</p>" +
+      '<div class="nl-principle-row">' + PRINCIPLE_CHIPS.map(function(c, i){
+        return '<div class="nl-principle-chip">'+esc(c)+"</div>" + (i<PRINCIPLE_CHIPS.length-1 ? '<span class="nl-principle-arrow">'+ICONS.arrowRight+"</span>" : "");
+      }).join("") + "</div>" +
+      '<div class="nl-core-caps">' +
+        '<div class="nl-core-cap"><b>会问</b>：沟通需求</div>' +
+        '<div class="nl-core-cap"><b>会答</b>：体现专家</div>' +
+      "</div>" +
+    "</div></div>";
+  }
+  function skillsHtml(){
+    return '<div class="nl-section"><div class="nl-skills-band">' +
+      '<div class="nl-section-head"><div class="nl-eyebrow">贯穿 Step 1 → Step 4</div>' +
+      "<h2>3 个沟通技巧，贯穿整段对话</h2>" +
+      "<p>这不是独立的3个步骤，而是在了解斑、找需求、带价值、Closing的每一个阶段，都应该自然地用上。</p></div>" +
+      '<div class="nl-skills-grid">' + SKILLS.map(function(s){
+        return '<div class="nl-skill-card"><div class="nl-skill-icon">'+ICONS[s.icon]+"</div>" +
+          "<div><div class=\"nl-skill-en\">"+esc(s.en)+"</div><h3>"+esc(s.cn)+"</h3></div>" +
+          "<p>"+esc(s.desc)+"</p></div>";
+      }).join("") + "</div>" +
+      '<div class="nl-skills-connector"><div class="line"></div><span>↓ 贯穿以下 4 个阶段 ↓</span><div class="line"></div></div>' +
+    "</div></div>";
+  }
+  function stepGoalsHtml(goals){
+    return '<div class="nl-step-goals"><div class="nl-step-goals-title">'+ICONS.target+" 这一步的目标</div><ul>" +
+      goals.map(function(g){ return "<li>"+ICONS.dot+"<span>"+esc(g)+"</span></li>"; }).join("") +
+    "</ul></div>";
+  }
+  function step1BodyHtml(){
+    return stepGoalsHtml(STEP1_GOALS) +
+      '<div class="nl-subhead">'+ICONS.target+" ABCDEF — 我们诊所常见的 6 种色素问题</div>" +
+      '<div class="nl-abcde-grid">' + ABCDEF.map(function(a){
+        return '<div class="nl-abcde-card"><div class="nl-abcde-letter">'+esc(a.letter)+"</div>" +
+          "<h4>"+esc(a.cn)+"</h4><div class=\"nl-abcde-en\">"+esc(a.en)+"</div>" +
+          "<p>"+esc(a.desc)+"</p></div>";
+      }).join("") + "</div>" +
+      '<div class="nl-callout warn"><div class="nl-callout-title">'+ICONS.alertTriangle+" 重要：ABCDEF 不是拿来对顾客下诊断的工具</div>" +
+      "这里的 ABCDEF，只是帮助我们快速记住诊所常见的 6 种色素问题，方便你在顾客描述斑况的时候，快速对上关键字、收集资讯——这跟医学上用来筛查皮肤癌的 ABCDE 检测是完全不同的两件事，请不要混为一谈。顾客的斑实际上属于哪一种，这一定要交给医生透过专业评估来判断，CSC 不能、也不应该替顾客下诊断。我们的角色，是把顾客描述的状况记录清楚，为医生评估做好准备。</div>" +
+      '<div class="nl-subhead">'+ICONS.question+' 开场提问示范</div>' +
+      '<div class="nl-example-box"><ul>' + STEP1_EXAMPLES.map(function(e){ return "<li>"+esc(e)+"</li>"; }).join("") + "</ul></div>";
+  }
+  function step2BodyHtml(){
+    return '<div class="nl-subhead">'+ICONS.target+" Diagnosis → Current Condition → Treatment History → Real Needs</div>" +
+      '<div class="nl-flow-row">' + STEP2_FLOW.map(function(f, i){
+        return '<div class="nl-flow-node"><div class="nl-flow-no">'+esc(f.no)+" · "+esc(f.en)+"</div>" +
+          "<h4>"+esc(f.cn)+"</h4><p>"+esc(f.desc)+"</p></div>" +
+          (i<STEP2_FLOW.length-1 ? '<div class="nl-flow-arrow">'+ICONS.arrowRight+"</div>" : "");
+      }).join("") + "</div>" +
+      '<div class="nl-subhead">'+ICONS.question+" 顺着回答往下挖 — 示范</div>" +
+      '<div class="nl-dig-demo"><div class="nl-dig-quote">顾客说：「我之前做过 Laser。」</div>' +
+      "<div class=\"nl-step-goals-title\">CSC 应该接着问：</div><ul style=\"margin:6px 0 0;padding-left:18px;\">" +
+      "<li style=\"font-size:12.5px;color:var(--ink);margin-bottom:4px;\">做了之后效果怎样？</li>" +
+      "<li style=\"font-size:12.5px;color:var(--ink);margin-bottom:4px;\">有没有出现反黑或者后来又复发？</li>" +
+      "<li style=\"font-size:12.5px;color:var(--ink);\">那现在是不是比较想找一个更适合自己肤质的方式？</li>" +
+      "</ul></div>" +
+      '<div class="nl-subhead">'+ICONS.alertTriangle+" Concern ≠ Need</div>" +
+      '<div class="nl-concern-need">' +
+        '<div class="nl-cn-card concern"><h4>Concern 顾虑</h4><p>顾客担心的表面问题——安全吗？有效吗？会不会很贵？要花多少时间？</p></div>' +
+        '<div class="nl-cn-card need"><h4>Need 需求</h4><p>顾客真正想改善的皮肤问题，以及心里期望达到的结果。</p></div>' +
+      "</div>" +
+      '<div class="nl-cn-caption">顾虑是「担心什么」，需求是「真正想要什么」——听懂顾虑，但别忘了往下挖真正的需求。</div>';
+  }
+  function valueCardHtml(v){
+    const open = expandedValueCard === v.id;
+    return '<div class="nl-value-card'+(open?" expanded":"")+'">' +
+      '<div class="nl-value-head" data-nl-action="toggle-value-card" data-id="'+esc(v.id)+'">' +
+        '<div class="nl-value-icon">'+ICONS[v.icon]+"</div><h4>"+esc(v.en)+"</h4>" +
+        '<span class="nl-value-chevron">'+ICONS.chevronDown+"</span>" +
+      "</div>" +
+      '<div class="nl-value-body">' +
+        '<div class="nl-value-row"><b>What it is</b><span>'+esc(v.what)+"</span></div>" +
+        '<div class="nl-value-row"><b>When to use</b><span>'+esc(v.when)+"</span></div>" +
+        '<div class="nl-value-row"><b>What value it delivers</b><span>'+esc(v.value)+"</span></div>" +
+        '<div class="nl-value-row"><b>Example communication</b></div>' +
+        '<div class="nl-value-example">“'+esc(v.example)+'”</div>' +
+      "</div></div>";
+  }
+  function threeSwordsCardHtml(){
+    const open = expandedValueCard === "three-swords";
+    const hasText = threeSwordsText && threeSwordsText.trim();
+    let body;
+    if(threeSwordsEditing){
+      body = '<textarea class="nl-threeswords-textarea" id="nlThreeSwordsInput" placeholder="输入贵诊所对「三剑客」的专业定义、使用时机与沟通示范…">'+esc(threeSwordsDraft)+'</textarea>' +
+        '<div class="nl-threeswords-actions">' +
+          '<button class="btn btn-primary btn-sm" data-nl-action="save-three-swords">'+ICONS.check+" 保存</button>" +
+          '<button class="btn btn-sm" data-nl-action="cancel-edit-three-swords">取消</button>' +
+        "</div>";
+    } else if(hasText){
+      body = '<div style="font-size:12.5px;color:var(--ink);white-space:pre-wrap;line-height:1.6;">'+esc(threeSwordsText)+"</div>";
+    } else {
+      body = '<div class="nl-threeswords-placeholder">这个概念尚未定义——请 Admin 点击右上角的编辑图示，输入贵诊所对「三剑客」的专业说明、使用时机与沟通示范。</div>';
+    }
+    return '<div class="nl-value-card'+(open?" expanded":"")+'">' +
+      '<div class="nl-value-head" data-nl-action="toggle-value-card" data-id="three-swords">' +
+        '<div class="nl-value-icon">'+ICONS.shield+"</div><h4>三剑客 (Three Key Value Pillars)</h4>" +
+        (mode==="admin" && !threeSwordsEditing ? '<button class="btn btn-sm nl-threeswords-edit-btn" data-nl-action="edit-three-swords">'+ICONS.pencil+" 编辑</button>" : "") +
+        '<span class="nl-value-chevron">'+ICONS.chevronDown+"</span>" +
+      "</div>" +
+      '<div class="nl-value-body">'+body+"</div></div>";
+  }
+  function step3BodyHtml(){
+    return '<div class="nl-callout info"><div class="nl-callout-title">'+ICONS.sparkle+" 先找到需求，再带出对应价值</div>" +
+      "这一步不是把 AI Analysis、Testimonial、卫教图片一次全部丢给顾客。先回想 Step 2 找到的需求，再挑 1-2 个最适合的工具，针对性地解释。</div>" +
+      '<div class="nl-value-grid">' +
+        VALUE_CARDS.map(valueCardHtml).join("") +
+        threeSwordsCardHtml() +
+      "</div>";
+  }
+  function step4BodyHtml(){
+    return '<div class="nl-subhead">'+ICONS.target+" Closing Framework</div>" +
+      '<div class="nl-closing-grid">' + STEP4_FLOW.map(function(f){
+        return '<div class="nl-closing-node"><div class="nl-flow-no">'+esc(f.no)+" · "+esc(f.en)+"</div>" +
+          "<h4>"+esc(f.cn)+"</h4><p>"+esc(f.desc)+"</p></div>";
+      }).join("") + "</div>" +
+      '<div class="nl-subhead">'+ICONS.question+" Closing Scenarios — 点一下看建议"+"</div>" +
+      '<div class="nl-closing-scenarios">' + CLOSING_SCENARIOS.map(function(s, i){
+        return '<button type="button" class="nl-chip'+(activeClosing===i?" active":"")+'" data-nl-action="set-closing" data-idx="'+i+'">'+esc(s.label)+"</button>";
+      }).join("") + "</div>" +
+      (activeClosing!=null ? '<div class="nl-closing-result">'+esc(CLOSING_SCENARIOS[activeClosing].tip)+"</div>" : "") +
+      '<div class="nl-closing-note">Closing 要自然、有力量，不是硬套 Sales Script——顾客感觉到的应该是「被理解」，而不是「被推销」。</div>';
+  }
+
+  const STEPS_META = [
+    { id:"step1", no:"01", en:"Understand Pigmentation", cn:"了解他的斑", teaser:"先别急着介绍疗程——用 ABCDEF 快速对上顾客说的是哪一种斑", body:step1BodyHtml },
+    { id:"step2", no:"02", en:"Discover Real Needs", cn:"找需求", teaser:"顺着顾客的回答往下挖，而不是问完一轮Checklist就结束", body:step2BodyHtml },
+    { id:"step3", no:"03", en:"Build Professional Value", cn:"带价值", teaser:"先找到需求，再挑对的工具带出专业价值——不是一次全部发出去", body:step3BodyHtml },
+    { id:"step4", no:"04", en:"Guide to Appointment", cn:"Closing", teaser:"总结需求、给够价值之后，自然地主动引导预约", body:step4BodyHtml },
+  ];
+
+  function stepsHtml(){
+    return '<div class="nl-section"><div class="nl-section-head"><div class="nl-eyebrow">Interactive Journey</div>' +
+      "<h2>4 个阶段，带你走完整段New Lead对话</h2>" +
+      "<p>点击每个阶段展开详细内容、核心目标、关键问题和示范。</p></div>" +
+      '<div class="nl-steps">' + STEPS_META.map(function(s){
+        const open = !!expandedSteps[s.id];
+        return '<div class="nl-step'+(open?" expanded":"")+'">' +
+          '<div class="nl-step-head" data-nl-action="toggle-step" data-id="'+s.id+'">' +
+            '<div class="nl-step-no">'+esc(s.no)+"</div>" +
+            '<div class="nl-step-head-text"><div class="nl-step-kicker">STEP '+esc(s.no)+" · "+esc(s.en)+"</div>" +
+              "<h3>"+esc(s.cn)+"</h3><div class=\"nl-step-teaser\">"+esc(s.teaser)+"</div></div>" +
+            '<span class="nl-step-chevron">'+ICONS.chevronDown+"</span>" +
+          "</div>" +
+          '<div class="nl-step-body">' + (open ? s.body() : "") + "</div>" +
+        "</div>";
+      }).join("") + "</div></div>";
+  }
+
+  function simulatorHtml(){
+    const s = SCENARIOS[activeScenario] || SCENARIOS[0];
+    return '<div class="nl-section"><div class="nl-section-head"><div class="nl-eyebrow">Scenario Learning</div>' +
+      "<h2>情境模拟 — 顾客这样说，你可以怎么接？</h2>" +
+      "<p>选一句顾客常见的回应，看看可以怎么继续挖需求、带价值、往Closing走。</p></div>" +
+      '<div class="nl-sim-card"><div class="nl-sim-chips">' + SCENARIOS.map(function(sc, i){
+        return '<button type="button" class="nl-chip'+(activeScenario===i?" active":"")+'" data-nl-action="set-scenario" data-idx="'+i+'">'+esc(sc.quote)+"</button>";
+      }).join("") + "</div>" +
+      '<div class="nl-sim-result"><div class="nl-sim-quote">“'+esc(s.quote)+'”</div>' +
+      '<div class="nl-sim-rows">' +
+        '<div class="nl-sim-row"><div class="nl-sim-tag">需求方向</div><p>'+esc(s.need)+"</p></div>" +
+        '<div class="nl-sim-row"><div class="nl-sim-tag">价值工具</div><p>'+esc(s.value)+"</p></div>" +
+        '<div class="nl-sim-row"><div class="nl-sim-tag">Closing思路</div><p>'+esc(s.closing)+"</p></div>" +
+      "</div></div></div></div>";
+  }
+
+
+  function mistakesHtml(){
+    return '<div class="nl-section"><div class="nl-section-head"><div class="nl-eyebrow">Common Mistakes</div>' +
+      "<h2>常见错误 vs 更好的做法</h2></div>" +
+      '<div class="nl-mistakes-grid">' + MISTAKES.map(function(m){
+        return '<div class="nl-mistake-row">' +
+          '<div class="nl-mistake-card bad">'+ICONS.x+"<p>"+esc(m.bad)+"</p></div>" +
+          '<div class="nl-mistake-card good">'+ICONS.check+"<p>"+esc(m.good)+"</p></div>" +
+        "</div>";
+      }).join("") + "</div></div>";
+  }
+
+  function footerHtml(){
+    return '<div class="nl-footer"><div class="nl-footer-tagline">会问：沟通需求　|　会答：体现专家</div>' +
+      '<div class="nl-footer-sub">New Leads 的每一次对话，都是建立信任的机会。</div></div>';
+  }
+
+  function adminPasswordModalHtml(){
+    return '<div class="overlay" data-nl-action="close-modal-bg"><div class="modal">' +
+      '<h2>Admin Mode</h2><div class="modal-sub">输入密码以解锁编辑权限（跟其他分页共用同一组密码）。</div>' +
+      '<div class="field"><label>密码</label><input type="password" id="nlAdminPwInput" placeholder="输入密码" /></div>' +
+      '<div class="modal-actions"><button class="btn" data-nl-action="close-modal">取消</button><button class="btn btn-primary" data-nl-action="submit-admin-password">解锁</button></div>' +
+    "</div></div>";
+  }
+  function modalHtml(){
+    if(!modal) return "";
+    if(modal.type === "admin-password") return adminPasswordModalHtml();
+    return "";
+  }
+  function toastHtml(){
+    if(!toastMsg) return "";
+    return '<div class="toast'+(toastIsError?" toast-error":"")+'">'+esc(toastMsg)+"</div>";
+  }
+
+  function render(){
+    const root = document.getElementById("app-newleads");
+    if(!root) return;
+    root.innerHTML = adminBannerHtml() + headerHtml() + heroHtml() +
+      '<div class="nl-wrap">' + skillsHtml() + stepsHtml() + simulatorHtml() + mistakesHtml() + footerHtml() + "</div>" +
+      modalHtml() + toastHtml();
+    if(modal && modal.type === "admin-password"){
+      const inp = document.getElementById("nlAdminPwInput");
+      if(inp) inp.focus();
+    }
+    if(threeSwordsEditing){
+      const ta = document.getElementById("nlThreeSwordsInput");
+      if(ta) ta.focus();
+    }
+  }
+
+  /* ============================= CLICK DISPATCH ============================= */
+  document.addEventListener("click", function(e){
+    const modeBtn = e.target.closest("#app-newleads [data-nl-mode]");
+    if(modeBtn){
+      const target = modeBtn.dataset.nlMode;
+      if(target === "admin" && !adminUnlocked){
+        modal = { type:"admin-password" };
+        render();
+        return;
+      }
+      mode = target;
+      render();
+      return;
+    }
+
+    const el = e.target.closest("#app-newleads [data-nl-action]");
+    if(!el) return;
+    const action = el.dataset.nlAction;
+    const id = el.dataset.id;
+
+    switch(action){
+      case "toggle-step":
+        expandedSteps[id] = !expandedSteps[id];
+        render();
+        break;
+      case "toggle-value-card":
+        expandedValueCard = (expandedValueCard === id) ? null : id;
+        render();
+        break;
+      case "set-scenario":
+        activeScenario = parseInt(el.dataset.idx, 10) || 0;
+        render();
+        break;
+      case "set-closing":
+        activeClosing = parseInt(el.dataset.idx, 10);
+        render();
+        break;
+      case "edit-three-swords":
+        threeSwordsDraft = threeSwordsText || "";
+        threeSwordsEditing = true;
+        render();
+        break;
+      case "cancel-edit-three-swords":
+        threeSwordsEditing = false;
+        render();
+        break;
+      case "save-three-swords": {
+        const ta = document.getElementById("nlThreeSwordsInput");
+        const text = ta ? ta.value : threeSwordsDraft;
+        threeSwordsEditing = false;
+        threeSwordsText = text;
+        render();
+        if(useDb && db){
+          db.collection("newLeadsContent").doc("threeSwords").set({ text: text }, { merge:true })
+            .then(function(){ showToast("已保存"); })
+            .catch(function(err){ showToast("保存失败："+(err&&err.message?err.message:"请检查网络连线"), true); });
+        } else {
+          showToast("已保存在本机（目前离线，没同步到团队）");
+        }
+        break;
+      }
+      case "close-modal":
+      case "close-modal-bg":
+        modal = null;
+        render();
+        break;
+      case "submit-admin-password": {
+        const pwInput = document.getElementById("nlAdminPwInput");
+        const val = pwInput ? pwInput.value : "";
+        if(val === ADMIN_PASSWORD){
+          adminUnlocked = true;
+          try{ sessionStorage.setItem("csc_admin_unlocked", "1"); }catch(e2){}
+          mode = "admin";
+          modal = null;
+          render();
+        } else {
+          showToast("密码不对，请再试一次", true);
+        }
+        break;
+      }
+    }
+  });
+  document.addEventListener("keydown", function(e){
+    if(!document.getElementById("app-newleads")) return;
+    if(modal && modal.type === "admin-password" && e.key === "Enter"){
+      const active = document.activeElement;
+      if(active && active.id === "nlAdminPwInput"){
+        document.querySelector('#app-newleads [data-nl-action="submit-admin-password"]').click();
+      }
+    }
+    if(e.key === "Escape" && modal){ modal = null; render(); }
+  });
+
+  /* ============================= INIT ============================= */
+  render();
+})();
+</script>
+
 <!-- ============ CSC Calling Thinking Map (会问会答 Map) ============
      Self-contained: renders inside a shadow root in #app-callmap so its styles never touch the rest of the Hub.
      Default content lives in #callmap-data; edits saved from the page go to Firestore doc callMap/main
