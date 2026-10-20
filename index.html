@@ -6132,6 +6132,16 @@ html[data-theme="dark"] #app-testimonial{
   async function deleteTestimonialCategory(id){
     await db.collection("testimonialCategories").doc(id).delete();
   }
+  function isMobileDevice(){
+    // Real phones/tablets only — never Windows/Mac/Linux laptops or desktops,
+    // even touchscreen ones. Checked against navigator.userAgent (and
+    // userAgentData.platform where available, since some browsers are starting
+    // to freeze the classic userAgent string).
+    try{
+      const ua = (navigator.userAgent || "") + " " + ((navigator.userAgentData && navigator.userAgentData.platform) || "");
+      return /iphone|ipad|ipod|android|mobile/i.test(ua) && !/windows nt|macintosh|linux x86_64|cros/i.test(ua);
+    }catch(e){ return false; }
+  }
   function downloadTestimonialHD(photo){
     if(!photo || !photo.chunkCount){ showToast("This photo's HD file isn't available right now", true); return; }
     showToast("Preparing HD download…");
@@ -6143,7 +6153,12 @@ html[data-theme="dark"] #app-testimonial{
       // trick below and just open the image instead of saving it. Where the native
       // Share Sheet is available, use it — it lets the user tap "Save Image" to
       // put the HD photo straight into their phone's photo gallery.
-      if(navigator.canShare && typeof File !== "undefined"){
+      // IMPORTANT: only do this on actual phones/tablets. Windows and Mac laptops
+      // (even ones with a touchscreen, like the ASUS Vivobook) also report
+      // navigator.canShare === true, but popping their OS "Share" dialog instead
+      // of just saving the file is confusing and breaks the normal download —
+      // those should always use the plain <a download> approach below.
+      if(isMobileDevice() && navigator.canShare && typeof File !== "undefined"){
         let shareFile;
         try{ shareFile = new File([blob], fileName, { type: blob.type || "application/octet-stream" }); }catch(mkErr){ shareFile = null; }
         if(shareFile && navigator.canShare({ files: [shareFile] })){
