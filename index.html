@@ -806,19 +806,17 @@ html[data-theme="dark"] #app-followup{
 <style>
 /* ============================================================
    PERSONALIZED — Respond.io WhatsApp template library.
-   Own hub pane (#app-personalized), every rule scoped under it so
-   nothing leaks into the other hubs. Same tokens / fonts / chips /
-   buttons as the Testimonial hub. Read-only snapshot of the templates
-   (names + message text only — no credentials, no customer data).
+   Own hub pane (#app-personalized); every rule is scoped under it so
+   nothing leaks into the other hubs. Read-only snapshot of the
+   templates (names + message text only — no credentials, no customer data).
    ============================================================ */
 #app-personalized{
-    --bg:#F3F5F3; --surface:#FFFFFF; --surface-2:#EBF1EE; --border:#DCE4DE; --border-soft:#E6ECE8;
+    --bg:#F3F5F3; --surface:#FFFFFF; --surface-2:#EEF3F0; --border:#DCE4DE; --border-soft:#E8EEEA;
     --ink:#172321; --ink-2:#55635E; --ink-3:#89948E;
     --accent:#1F5C52; --accent-2:#163F39; --accent-soft:#DCEEE9; --accent-soft-ink:#12433C;
-    --danger:#B3413A; --danger-bg:#FBEAE8; --danger-border:#F0CBC7;
-    --success:#2E7D4F;
-    --shadow-sm:0 1px 2px rgba(23,35,33,0.06); --shadow-md:0 6px 20px rgba(23,35,33,0.08);
-    --radius:14px; --radius-sm:9px;
+    --success:#22A06B;
+    --chat-bg:#EFEAE2; --bubble:#D9FDD3; --bubble-ink:#111B21; --bubble-btn:#FFFFFF; --bubble-btn-ink:#027EB5;
+    --shadow-sm:0 1px 2px rgba(23,35,33,.06); --shadow-md:0 8px 24px rgba(23,35,33,.08); --shadow-lg:0 18px 50px rgba(23,35,33,.14);
     margin:0;background:var(--bg);color:var(--ink);
     font-family:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
     font-size:14.5px;line-height:1.55;min-height:100vh;-webkit-font-smoothing:antialiased;
@@ -827,112 +825,237 @@ html[data-theme="dark"] #app-followup{
 html:not([data-theme="light"]) #app-personalized{
     --bg:#12201C; --surface:#182A25; --surface-2:#1E342D; --border:#2B453C; --border-soft:#24392F;
     --ink:#E7F1EC; --ink-2:#A9BDB4; --ink-3:#6F8880;
-    --accent:#5AC9B2; --accent-2:#3FA68F; --accent-soft:#1F3E36; --accent-soft-ink:#8FDFCB;
-    --danger:#E6897E; --danger-bg:#3A211E; --danger-border:#5C332C; --success:#6FCB91;
+    --accent:#5AC9B2; --accent-2:#3FA68F; --accent-soft:#1F3E36; --accent-soft-ink:#8FDFCB; --success:#3FCB8A;
+    --chat-bg:#0B141A; --bubble:#005C4B; --bubble-ink:#E9EDEF; --bubble-btn:#1F2C33; --bubble-btn-ink:#53BDEB;
   }}
 html[data-theme="dark"] #app-personalized{
     --bg:#12201C; --surface:#182A25; --surface-2:#1E342D; --border:#2B453C; --border-soft:#24392F;
     --ink:#E7F1EC; --ink-2:#A9BDB4; --ink-3:#6F8880;
-    --accent:#5AC9B2; --accent-2:#3FA68F; --accent-soft:#1F3E36; --accent-soft-ink:#8FDFCB;
-    --danger:#E6897E; --danger-bg:#3A211E; --danger-border:#5C332C; --success:#6FCB91;
+    --accent:#5AC9B2; --accent-2:#3FA68F; --accent-soft:#1F3E36; --accent-soft-ink:#8FDFCB; --success:#3FCB8A;
+    --chat-bg:#0B141A; --bubble:#005C4B; --bubble-ink:#E9EDEF; --bubble-btn:#1F2C33; --bubble-btn-ink:#53BDEB;
   }
-#app-personalized h1,#app-personalized h2,#app-personalized h3{
-    font-family:"Fraunces",Georgia,"Times New Roman",serif;font-weight:600;letter-spacing:-0.01em;color:var(--ink);margin:0;
-  }
+#app-personalized *{box-sizing:border-box;}
+#app-personalized h1,#app-personalized h2,#app-personalized h3{font-family:"Fraunces",Georgia,"Times New Roman",serif;font-weight:600;letter-spacing:-0.01em;margin:0;}
 #app-personalized button,#app-personalized input,#app-personalized select{font-family:inherit;}
-#app-personalized .app-header{
-    position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:18px;padding:13px 24px;
-    background:color-mix(in srgb, var(--surface) 92%, transparent);backdrop-filter:blur(10px);
-    border-bottom:1px solid var(--border-soft);
+#app-personalized .pz-wrap{max-width:1240px;margin:0 auto;padding:24px 24px 90px;}
+
+/* ---- Hero ---- */
+#app-personalized .pz-hero{
+    position:relative;overflow:hidden;border-radius:22px;padding:30px 32px;color:#fff;
+    background:radial-gradient(circle at 85% 20%, rgba(255,255,255,.18) 0, transparent 38%),
+               linear-gradient(135deg,#163F39 0%,#1F5C52 45%,#2F8C76 100%);
+    box-shadow:var(--shadow-lg);
   }
-#app-personalized .brand{display:flex;align-items:center;gap:9px;flex:none;}
-#app-personalized .brand-mark{
-    width:30px;height:30px;border-radius:9px;background:var(--accent);color:var(--surface);
-    display:flex;align-items:center;justify-content:center;font-size:16px;flex:none;
+#app-personalized .pz-hero h1{color:#fff;font-size:34px;line-height:1.1;}
+#app-personalized .pz-hero p{margin:8px 0 0;color:rgba(255,255,255,.82);font-size:14px;max-width:560px;}
+#app-personalized .pz-eyebrow{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.75);margin-bottom:10px;}
+#app-personalized .pz-stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;position:relative;z-index:1;}
+#app-personalized .pz-stat{
+    background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(6px);
+    border-radius:14px;padding:10px 16px;min-width:110px;
   }
-#app-personalized .brand-name{font-family:"Fraunces",serif;font-weight:600;font-size:16px;white-space:nowrap;}
-#app-personalized .header-right{display:flex;align-items:center;gap:12px;margin-left:auto;flex-wrap:wrap;}
-#app-personalized .sync-badge{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-3);white-space:nowrap;}
-#app-personalized .sync-dot{width:7px;height:7px;border-radius:50%;background:var(--success);flex:none;}
-#app-personalized .pz-wrap{max-width:1180px;margin:0 auto;padding:28px 24px 90px;}
-#app-personalized .pz-head p{color:var(--ink-2);font-size:13.5px;margin:4px 0 0;}
+#app-personalized .pz-stat b{display:block;font-size:22px;line-height:1.1;font-weight:700;}
+#app-personalized .pz-stat span{font-size:11.5px;color:rgba(255,255,255,.75);}
+#app-personalized .pz-deco{position:absolute;right:28px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:10px;align-items:flex-end;pointer-events:none;}
+#app-personalized .pz-deco i{
+    display:block;font-style:normal;font-size:13px;padding:9px 14px;border-radius:16px 16px 4px 16px;
+    background:#D9FDD3;color:#111B21;box-shadow:0 6px 16px rgba(0,0,0,.18);white-space:nowrap;
+  }
+#app-personalized .pz-deco i:nth-child(2){background:#fff;border-radius:16px 16px 16px 4px;align-self:flex-start;transform:translateX(-30px);}
+#app-personalized .pz-deco i:nth-child(3){opacity:.85;}
+
+/* ---- Filter bar ---- */
+#app-personalized .pz-filters{
+    position:sticky;top:52px;z-index:30;margin-top:18px;
+    background:color-mix(in srgb, var(--surface) 94%, transparent);backdrop-filter:blur(10px);
+    border:1px solid var(--border);border-radius:18px;padding:14px;box-shadow:var(--shadow-md);
+  }
+#app-personalized .pz-frow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+#app-personalized .pz-frow + .pz-frow{margin-top:12px;}
 #app-personalized .pz-search{
-    display:flex;align-items:center;gap:8px;margin:18px 0 12px;padding:0 14px;height:42px;
-    background:var(--surface);border:1px solid var(--border);border-radius:11px;box-shadow:var(--shadow-sm);
+    flex:1 1 320px;display:flex;align-items:center;gap:8px;height:46px;padding:0 14px;
+    background:var(--surface-2);border:1.5px solid transparent;border-radius:13px;transition:border-color .15s, background .15s;
   }
-#app-personalized .pz-search:focus-within{border-color:var(--accent);}
-#app-personalized .pz-search input{flex:1;min-width:0;border:none;outline:none;background:none;color:var(--ink);font-size:14px;}
+#app-personalized .pz-search:focus-within{border-color:var(--accent);background:var(--surface);}
+#app-personalized .pz-search svg{width:18px;height:18px;color:var(--ink-3);flex:none;}
+#app-personalized .pz-search input{flex:1;min-width:0;border:none;outline:none;background:none;color:var(--ink);font-size:14.5px;}
 #app-personalized .pz-search input::placeholder{color:var(--ink-3);}
-#app-personalized .pz-search .pz-clear{border:none;background:none;color:var(--ink-3);cursor:pointer;font-size:16px;padding:4px;}
-#app-personalized .pz-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0;}
-#app-personalized .pz-row-label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin-right:2px;}
-#app-personalized .tst-filter-chip{
-    border:1px solid var(--border);background:var(--surface);color:var(--ink-2);border-radius:999px;
-    padding:7px 14px;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;
+#app-personalized .pz-search input::-webkit-search-cancel-button{display:none;}
+#app-personalized .pz-clear{border:none;background:var(--border);color:var(--ink-2);cursor:pointer;width:22px;height:22px;border-radius:50%;font-size:11px;flex:none;}
+#app-personalized .pz-selectbox{position:relative;flex:0 1 340px;min-width:240px;}
+#app-personalized .pz-selectbox .pz-sel-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;pointer-events:none;}
+#app-personalized .pz-selectbox select{
+    -webkit-appearance:none;appearance:none;width:100%;height:46px;padding:0 40px 0 42px;
+    border-radius:13px;border:1.5px solid var(--border);background:var(--surface);color:var(--ink);
+    font-size:14px;font-weight:600;cursor:pointer;outline:none;
   }
-#app-personalized .tst-filter-chip:hover{background:var(--surface-2);}
-#app-personalized .tst-filter-chip .cnt{background:var(--surface-2);color:var(--ink-3);border-radius:999px;padding:1px 7px;font-size:11px;}
-#app-personalized .tst-filter-chip.active{background:var(--accent);border-color:var(--accent);color:var(--surface);}
-#app-personalized .tst-filter-chip.active .cnt{background:rgba(255,255,255,.25);color:var(--surface);}
-#app-personalized .pz-select{
-    height:36px;padding:0 12px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--ink);
-    font-size:13px;font-weight:600;cursor:pointer;max-width:100%;
+#app-personalized .pz-selectbox select:focus{border-color:var(--accent);}
+#app-personalized .pz-selectbox::after{
+    content:"";position:absolute;right:16px;top:50%;width:8px;height:8px;margin-top:-6px;pointer-events:none;
+    border-right:2px solid var(--ink-2);border-bottom:2px solid var(--ink-2);transform:rotate(45deg);
   }
-#app-personalized .pz-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:16px 0 4px;}
+#app-personalized .pz-seg{display:inline-flex;gap:2px;padding:3px;border-radius:12px;background:var(--surface-2);flex-wrap:wrap;}
+#app-personalized .pz-seg button{
+    border:none;background:none;padding:7px 13px;border-radius:9px;font-size:12.5px;font-weight:600;color:var(--ink-2);cursor:pointer;
+    display:inline-flex;align-items:center;gap:6px;
+  }
+#app-personalized .pz-seg button .cnt{font-size:11px;color:var(--ink-3);font-weight:600;}
+#app-personalized .pz-seg button.active{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-sm);}
+#app-personalized .pz-seg button.active .cnt{color:var(--accent);}
+#app-personalized .pz-spacer{flex:1;}
 #app-personalized .pz-result{font-size:12.5px;color:var(--ink-3);}
-#app-personalized .btn{
-    display:inline-flex;align-items:center;gap:7px;padding:8px 15px;border-radius:9px;font-size:13px;font-weight:600;
-    cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--ink);white-space:nowrap;
+#app-personalized .pz-result b{color:var(--ink);}
+#app-personalized .pz-ghost{
+    border:1px solid var(--border);background:var(--surface);color:var(--ink-2);border-radius:10px;
+    padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;
   }
-#app-personalized .btn:hover{background:var(--surface-2);}
-#app-personalized .btn-primary{background:var(--accent);border-color:var(--accent);color:var(--surface);}
-#app-personalized .btn-primary:hover{background:var(--accent-2);border-color:var(--accent-2);}
-#app-personalized .btn-sm{padding:6px 12px;font-size:12px;}
-#app-personalized .btn.copied{background:var(--success);border-color:var(--success);color:#fff;}
-#app-personalized .pz-group{margin-top:26px;}
-#app-personalized .pz-group-title{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;}
-#app-personalized .pz-group-title h2{font-size:18px;}
-#app-personalized .pz-group-title span{font-size:12px;color:var(--ink-3);}
-#app-personalized .pz-list{display:flex;flex-direction:column;gap:8px;}
-#app-personalized .pz-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:var(--shadow-sm);overflow:hidden;}
-#app-personalized .pz-card.open{border-color:color-mix(in srgb, var(--accent) 45%, var(--border));}
-#app-personalized .pz-card-head{display:flex;align-items:center;gap:10px;padding:10px 12px 10px 14px;cursor:pointer;}
-#app-personalized .pz-caret{flex:none;width:16px;color:var(--ink-3);transition:transform .15s;font-size:11px;}
-#app-personalized .pz-card.open .pz-caret{transform:rotate(90deg);}
+#app-personalized .pz-ghost:hover{background:var(--surface-2);color:var(--ink);}
+
+/* ---- Groups ---- */
+#app-personalized .pz-group{margin-top:30px;}
+#app-personalized .pz-ghead{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+#app-personalized .pz-ico{
+    width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex:none;
+    background:color-mix(in srgb, var(--hue) 16%, var(--surface));
+    border:1px solid color-mix(in srgb, var(--hue) 28%, transparent);
+  }
+#app-personalized .pz-ghead h2{font-size:19px;color:var(--ink);}
+#app-personalized .pz-ghead .pz-gsub{font-size:12px;color:var(--ink-3);}
+#app-personalized .pz-gcount{margin-left:auto;font-size:12px;font-weight:700;color:var(--hue);background:color-mix(in srgb, var(--hue) 12%, var(--surface));padding:4px 10px;border-radius:999px;}
+#app-personalized .pz-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:12px;align-items:start;}
+
+/* ---- Template card ---- */
+#app-personalized .pz-card{
+    position:relative;background:var(--surface);border:1px solid var(--border);border-radius:16px;
+    box-shadow:var(--shadow-sm);overflow:hidden;transition:box-shadow .18s, transform .18s, border-color .18s;
+  }
+#app-personalized .pz-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--hue);opacity:.85;}
+#app-personalized .pz-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px);}
+#app-personalized .pz-card.open{grid-column:1 / -1;border-color:color-mix(in srgb, var(--hue) 45%, var(--border));box-shadow:var(--shadow-md);transform:none;}
+#app-personalized .pz-head{display:flex;align-items:flex-start;gap:12px;padding:14px 14px 14px 18px;cursor:pointer;}
+#app-personalized .pz-head .pz-ico{width:36px;height:36px;font-size:17px;border-radius:11px;}
 #app-personalized .pz-main{flex:1;min-width:0;}
-#app-personalized .pz-name{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;font-weight:600;color:var(--ink);word-break:break-all;}
-#app-personalized .pz-preview{font-size:12.5px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
+#app-personalized .pz-name{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;font-weight:700;color:var(--ink);word-break:break-all;}
+#app-personalized .pz-preview{
+    font-size:13px;color:var(--ink-2);margin-top:3px;line-height:1.5;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  }
 #app-personalized .pz-card.open .pz-preview{display:none;}
-#app-personalized .pz-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px;}
-#app-personalized .tst-cat-tag{
-    display:inline-flex;align-items:center;width:fit-content;padding:2px 9px;border-radius:100px;
-    background:var(--accent-soft);color:var(--accent-soft-ink);font-size:11px;font-weight:700;letter-spacing:.02em;
+#app-personalized .pz-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+#app-personalized .pz-tag{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:700;background:var(--surface-2);color:var(--ink-2);}
+#app-personalized .pz-tag.cat{background:color-mix(in srgb, var(--hue) 13%, var(--surface));color:color-mix(in srgb, var(--hue) 75%, var(--ink));}
+#app-personalized .pz-tag.warn{background:#FDECEA;color:#B3261E;}
+#app-personalized .pz-tag.media{background:#EAF2FF;color:#1D5BBF;}
+#app-personalized .pz-side{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex:none;}
+#app-personalized .pz-copy{
+    display:inline-flex;align-items:center;gap:6px;border:none;cursor:pointer;
+    background:var(--accent);color:#fff;font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:999px;
+    box-shadow:0 4px 12px color-mix(in srgb, var(--accent) 35%, transparent);transition:transform .12s, background .15s;
   }
-#app-personalized .pz-lang{background:var(--surface-2);color:var(--ink-2);}
-#app-personalized .pz-warn{background:var(--danger-bg);color:var(--danger);}
-#app-personalized .pz-card-body{display:none;padding:0 14px 14px 40px;}
-#app-personalized .pz-card.open .pz-card-body{display:block;}
-#app-personalized .pz-msg{
-    white-space:pre-wrap;word-break:break-word;font-size:14px;line-height:1.6;color:var(--ink);
-    background:var(--surface-2);border:1px solid var(--border-soft);border-radius:9px;padding:12px 14px;
+#app-personalized .pz-copy:hover{transform:translateY(-1px);background:var(--accent-2);}
+#app-personalized .pz-copy:active{transform:scale(.96);}
+#app-personalized .pz-copy.copied{background:var(--success);}
+#app-personalized .pz-copy svg{width:14px;height:14px;}
+#app-personalized .pz-more{font-size:11.5px;color:var(--ink-3);font-weight:600;display:inline-flex;align-items:center;gap:4px;}
+#app-personalized .pz-more i{display:inline-block;font-style:normal;transition:transform .18s;}
+#app-personalized .pz-card.open .pz-more i{transform:rotate(180deg);}
+
+/* ---- Expanded: WhatsApp-style preview ---- */
+#app-personalized .pz-body{display:none;padding:0 16px 16px 18px;}
+#app-personalized .pz-card.open .pz-body{display:block;}
+#app-personalized .pz-chat{
+    background-color:var(--chat-bg);border-radius:14px;padding:18px 16px;
+    background-image:radial-gradient(color-mix(in srgb, var(--ink) 6%, transparent) 1px, transparent 1px);background-size:16px 16px;
   }
-#app-personalized .pz-note{font-size:12px;color:var(--ink-3);margin:8px 0 0;}
-#app-personalized .pz-btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
-#app-personalized .pz-btns span{font-size:12px;border:1px dashed var(--border);border-radius:7px;padding:3px 9px;color:var(--ink-2);}
-#app-personalized .pz-cardslide{margin-top:10px;}
-#app-personalized .pz-cardslide-label{font-size:11px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;}
-#app-personalized .empty-state{text-align:center;padding:70px 20px;color:var(--ink-3);}
-#app-personalized .empty-state h3{font-size:16px;margin-bottom:6px;color:var(--ink-2);}
-@media (max-width:720px){
-  #app-personalized .app-header{padding:11px 14px;gap:10px;flex-wrap:wrap;}
-  #app-personalized .pz-wrap{padding:18px 14px 70px;}
-  #app-personalized .pz-card-head{flex-wrap:wrap;}
-  #app-personalized .pz-card-head .btn{margin-left:26px;}
-  #app-personalized .pz-card-body{padding:0 12px 12px 12px;}
-  #app-personalized .pz-cat-chips{display:none;}
+#app-personalized .pz-bubble{
+    position:relative;max-width:620px;background:var(--bubble);color:var(--bubble-ink);
+    border-radius:12px 12px 12px 3px;padding:10px 13px;box-shadow:0 1px 1px rgba(0,0,0,.08);
+    white-space:pre-wrap;word-break:break-word;font-size:14.5px;line-height:1.55;
+  }
+#app-personalized .pz-bubble + .pz-bubble{margin-top:10px;}
+#app-personalized .pz-bmedia{
+    display:flex;align-items:center;justify-content:center;gap:8px;height:90px;border-radius:8px;margin-bottom:8px;
+    background:color-mix(in srgb, var(--bubble-ink) 10%, transparent);font-size:13px;font-weight:600;
+  }
+#app-personalized .pz-bbtns{max-width:620px;display:flex;flex-direction:column;gap:2px;margin-top:3px;}
+#app-personalized .pz-bbtns span{background:var(--bubble-btn);color:var(--bubble-btn-ink);text-align:center;font-size:13.5px;font-weight:600;padding:8px;border-radius:8px;box-shadow:0 1px 1px rgba(0,0,0,.06);}
+#app-personalized .pz-clabel{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin:14px 0 6px;}
+#app-personalized .pz-clabel:first-child{margin-top:0;}
+#app-personalized .pz-note{font-size:12px;color:var(--ink-3);margin-top:10px;}
+
+/* ---- Admin ---- */
+#app-personalized .pz-mode button.admin-on{background:#7A2E2E;color:#fff;}
+#app-personalized .pz-admin-bar{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:12px;
+    padding:11px 14px;border-radius:14px;font-size:13px;color:#7A2E2E;
+    background:#FDF0EE;border:1px solid #F3CFC9;
+  }
+#app-personalized .pz-admin-bar[hidden]{display:none;}
+#app-personalized .pz-admin-bar em{font-style:normal;opacity:.8;}
+#app-personalized .pz-adm{
+    border:1px solid var(--border);background:var(--surface);border-radius:999px;padding:5px 11px;
+    font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;
+  }
+#app-personalized .pz-adm.del{color:#B3261E;border-color:#F3CFC9;}
+#app-personalized .pz-adm.del:hover{background:#FDECEA;}
+#app-personalized .pz-adm.restore{color:var(--accent);border-color:color-mix(in srgb, var(--accent) 35%, var(--border));}
+#app-personalized .pz-adm.restore:hover{background:var(--accent-soft);}
+#app-personalized .pz-copy.danger{background:#B3261E;box-shadow:0 4px 12px rgba(179,38,30,.3);}
+#app-personalized .pz-copy.danger:hover{background:#8C1D18;}
+#app-personalized .pz-overlay{
+    position:fixed;inset:0;z-index:500;background:rgba(10,20,18,.45);backdrop-filter:blur(3px);
+    display:flex;align-items:center;justify-content:center;padding:20px;
+  }
+#app-personalized .pz-dialog{
+    width:100%;max-width:400px;background:var(--surface);color:var(--ink);border-radius:20px;padding:26px 24px 20px;
+    box-shadow:var(--shadow-lg);text-align:center;
+  }
+#app-personalized .pz-dicon{font-size:34px;margin-bottom:6px;}
+#app-personalized .pz-dialog h3{font-size:20px;margin-bottom:6px;}
+#app-personalized .pz-dialog p{font-size:13.5px;color:var(--ink-2);margin:0 0 14px;line-height:1.6;}
+#app-personalized .pz-dialog code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--surface-2);padding:1px 6px;border-radius:6px;color:var(--ink);}
+#app-personalized .pz-dialog input{
+    width:100%;height:44px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface-2);
+    padding:0 14px;font-size:15px;color:var(--ink);outline:none;
+  }
+#app-personalized .pz-dialog input:focus{border-color:var(--accent);background:var(--surface);}
+#app-personalized .pz-derr{color:#B3261E;font-size:12.5px;margin-top:8px;}
+#app-personalized .pz-dbtns{display:flex;gap:8px;justify-content:center;margin-top:16px;}
+#app-personalized .pz-dbtns > *{flex:1;justify-content:center;padding:10px 14px;font-size:13.5px;}
+#app-personalized .pz-toast{
+    position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:600;
+    background:#172321;color:#fff;font-size:13px;font-weight:600;padding:10px 18px;border-radius:999px;
+    box-shadow:var(--shadow-lg);max-width:calc(100% - 32px);
+  }
+#app-personalized .pz-toast.err{background:#B3261E;}
+#app-personalized .pz-toast[hidden]{display:none;}
+
+#app-personalized .pz-empty{text-align:center;padding:70px 20px;color:var(--ink-3);}
+#app-personalized .pz-empty div:first-child{font-size:40px;margin-bottom:8px;}
+#app-personalized .pz-empty h3{font-size:17px;color:var(--ink-2);margin-bottom:4px;}
+
+@media (max-width:860px){
+  #app-personalized .pz-deco{display:none;}
 }
-@media (min-width:721px){
-  #app-personalized .pz-cat-select-row{display:none;}
+@media (max-width:720px){
+  #app-personalized .pz-wrap{padding:14px 12px 70px;}
+  #app-personalized .pz-hero{padding:22px 20px;border-radius:18px;}
+  #app-personalized .pz-hero h1{font-size:27px;}
+  #app-personalized .pz-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  #app-personalized .pz-stat{min-width:0;padding:8px 12px;}
+  #app-personalized .pz-stat b{font-size:17px;white-space:nowrap;}
+  #app-personalized .pz-stat span{white-space:nowrap;}
+  #app-personalized .pz-filters{padding:10px;border-radius:15px;position:static;}
+  #app-personalized .pz-search,#app-personalized .pz-selectbox{flex:1 1 100%;min-width:0;}
+  #app-personalized .pz-seg{width:100%;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;}
+  #app-personalized .pz-seg::-webkit-scrollbar{display:none;}
+  #app-personalized .pz-seg button{flex:1 0 auto;justify-content:center;padding:7px 9px;white-space:nowrap;}
+  #app-personalized .pz-spacer{display:none;}
+  #app-personalized .pz-result{flex:1;}
+  #app-personalized .pz-grid{grid-template-columns:1fr;}
+  #app-personalized .pz-head{padding:12px 12px 12px 16px;gap:10px;}
+  #app-personalized .pz-body{padding:0 10px 12px 14px;}
+  #app-personalized .pz-chat{padding:12px 10px;}
 }
 </style>
 </head>
@@ -8284,34 +8407,37 @@ connect();
   var HOST = document.getElementById("app-personalized");
   if(!HOST) return;
   var RAW;
-  try{ RAW = JSON.parse(document.getElementById("pz-data").textContent); }catch(e){ HOST.innerHTML='<div class="empty-state"><h3>Template data failed to load</h3></div>'; return; }
+  try{ RAW = JSON.parse(document.getElementById("pz-data").textContent); }catch(e){ HOST.innerHTML='<div class="pz-empty"><h3>Template data failed to load</h3></div>'; return; }
   var DATA = RAW.items, SYNCED = RAW.synced;
 
+  // [id, emoji, 中文, English, colour]
   var CATS = [
-    ["first_contact","初次联系 · First Contact"],
-    ["discovery","了解需求 · Discovery"],
-    ["no_answer","没接电话/没回复 · No Answer"],
-    ["appt_invite","邀约预约 · Appointment Invitation"],
-    ["appt_confirm","预约确认/提醒 · Confirmation & Reminder"],
-    ["appt_day","到店当天/改期 · Appointment Day & Reschedule"],
-    ["location","分行/地址/营业时间 · Location & Hours"],
-    ["treatment_info","护理介绍 · Treatment Info"],
-    ["before_after","效果对比图 · Before & After"],
-    ["price","价格/配套顾虑 · Price Concerns"],
-    ["treatment_concern","效果/护理顾虑 · Treatment Concerns"],
-    ["family","家人朋友决定 · Family & Friends"],
-    ["promo","优惠介绍 · Promotional Offers"],
-    ["promo_fup","优惠跟进 · Promo Follow Up"],
-    ["reengage","冷客户唤醒 · Re-engagement"],
-    ["story","情感/故事文案 · Story & Hook"],
-    ["broadcast","群发活动 · Broadcast & Campaign"],
-    ["rewards","老顾客回馈/周年 · Member Rewards"],
-    ["aftercare","护理后关心 · After-Treatment Care"],
-    ["other","其他 · Other"]
+    ["first_contact","👋","初次联系","First Contact","#3B82F6"],
+    ["discovery","🔍","了解需求","Discovery","#8B5CF6"],
+    ["no_answer","📞","没接电话/没回复","No Answer","#EF4444"],
+    ["appt_invite","📅","邀约预约","Appointment Invitation","#10B981"],
+    ["appt_confirm","✅","预约确认/提醒","Confirmation & Reminder","#059669"],
+    ["appt_day","🚶‍♀️","到店当天/改期","Appointment Day & Reschedule","#F59E0B"],
+    ["location","📍","分行/地址/营业时间","Location & Hours","#0EA5E9"],
+    ["treatment_info","💡","护理介绍","Treatment Info","#6366F1"],
+    ["before_after","🪞","效果对比图","Before & After","#EC4899"],
+    ["price","💰","价格/配套顾虑","Price Concerns","#D97706"],
+    ["treatment_concern","🤔","效果/护理顾虑","Treatment Concerns","#F43F5E"],
+    ["family","👨‍👩‍👧","家人朋友决定","Family & Friends","#14B8A6"],
+    ["promo","🎁","优惠介绍","Promotional Offers","#E11D48"],
+    ["promo_fup","⏰","优惠跟进","Promo Follow Up","#F97316"],
+    ["reengage","🔄","冷客户唤醒","Re-engagement","#7C3AED"],
+    ["story","💌","情感/故事文案","Story & Hook","#DB2777"],
+    ["broadcast","📣","群发活动","Broadcast & Campaign","#2563EB"],
+    ["rewards","🏆","老顾客回馈/周年","Member Rewards","#CA8A04"],
+    ["aftercare","💚","护理后关心","After-Treatment Care","#16A34A"],
+    ["other","🗂️","其他","Other","#64748B"]
   ];
-  var CAT_LABEL = {}; CATS.forEach(function(c){ CAT_LABEL[c[0]] = c[1]; });
-  var LANGS = [["all","全部 All"],["Chinese","中文 Chinese"],["English","English"],["Mixed","中英 Mixed"],["Malay","Malay"]];
-  var MEDIA = {image:"🖼️ 附图片 Image", video:"🎬 附视频 Video", document:"📄 附文件 Document"};
+  var CAT = {}; CATS.forEach(function(c){ CAT[c[0]] = {emoji:c[1], zh:c[2], en:c[3], hue:c[4], label:c[2]+" · "+c[3]}; });
+  var LANGS = [["all","全部"],["Chinese","中文"],["English","English"],["Mixed","中英"],["Malay","Malay"]];
+  var MEDIA = {image:"🖼️ 图片 Image", video:"🎬 视频 Video", document:"📄 文件 Document"};
+  var ICON_COPY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+  var ICON_SEARCH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
 
   // Text a CSC pastes: header text + body + footer (+ each carousel card), exactly as in Respond.io.
   DATA.forEach(function(t, i){
@@ -8322,15 +8448,31 @@ connect();
     if(t.f) parts.push(t.f);
     (t.cards || []).forEach(function(c){ if(c.b) parts.push(c.b); });
     t.copy = parts.join("\n\n");
-    t.hay = (t.n + " " + t.copy + " " + (CAT_LABEL[t.c]||"") + " " + t.lang).toLowerCase();
+    var cat = CAT[t.c] || {};
+    t.hay = (t.n + " " + t.copy + " " + (cat.label||"") + " " + t.lang).toLowerCase();
   });
 
-  var S = { q:"", cat:"all", lang:"all", open:{} };
+  // Stable per-template key: name + a hash of its text (names repeat across languages).
+  function hashStr(str){ var h=5381; for(var i=0;i<str.length;i++){ h=((h<<5)+h+str.charCodeAt(i))|0; } return (h>>>0).toString(36); }
+  DATA.forEach(function(t){ t.key = (t.n + "__" + hashStr(t.copy)).replace(/[\/.#$\[\]]/g, "_"); });
+
+  var S = { q:"", cat:"all", lang:"all", open:{}, mode:"csc", showHidden:false, modal:null };
+  var HIDDEN = {};                     // key -> {name, hiddenAt}
+  var ADMIN_PASSWORD = "agh030222";    // same password + session key as every other hub
+  var adminUnlocked = false;
+  try{ adminUnlocked = sessionStorage.getItem("csc_admin_unlocked") === "1"; }catch(e){}
+  var db = null, useDb = false;
+  var LOCAL_KEY = "pz_hidden_local";
+  function loadLocalHidden(){ try{ HIDDEN = JSON.parse(localStorage.getItem(LOCAL_KEY) || "{}") || {}; }catch(e){ HIDDEN = {}; } }
+  function saveLocalHidden(){ try{ localStorage.setItem(LOCAL_KEY, JSON.stringify(HIDDEN)); }catch(e){} }
+  function isHidden(t){ return !!HIDDEN[t.key]; }
 
   function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
   function langLabel(l){ return l==="Chinese"?"中文":l==="Mixed"?"中英 Mixed":l; }
 
   function matches(t, ignoreCat, ignoreLang){
+    if(S.mode==="admin" && S.showHidden){ if(!isHidden(t)) return false; }
+    else if(isHidden(t)) return false;
     if(!ignoreCat && S.cat!=="all" && t.c!==S.cat) return false;
     if(!ignoreLang && S.lang!=="all" && t.lang!==S.lang) return false;
     if(S.q){
@@ -8341,84 +8483,176 @@ connect();
   }
 
   function shell(){
-    var catChips = '<button type="button" class="tst-filter-chip" data-pz-cat="all">全部 All <span class="cnt" data-pz-cnt-cat="all"></span></button>' +
-      CATS.map(function(c){ return '<button type="button" class="tst-filter-chip" data-pz-cat="'+c[0]+'">'+esc(c[1])+' <span class="cnt" data-pz-cnt-cat="'+c[0]+'"></span></button>'; }).join("");
-    var catOpts = '<option value="all">全部类别 All categories</option>' + CATS.map(function(c){ return '<option value="'+c[0]+'">'+esc(c[1])+'</option>'; }).join("");
-    var langChips = LANGS.map(function(l){ return '<button type="button" class="tst-filter-chip" data-pz-lang="'+l[0]+'">'+esc(l[1])+' <span class="cnt" data-pz-cnt-lang="'+l[0]+'"></span></button>'; }).join("");
+    var langs = {}; DATA.forEach(function(t){ langs[t.lang]=1; });
     HOST.innerHTML =
-      '<header class="app-header">' +
-        '<div class="brand"><div class="brand-mark">✍️</div><span class="brand-name">Personalized Templates</span></div>' +
-        '<div class="header-right"><span class="sync-badge"><span class="sync-dot"></span>'+DATA.length+' templates · Respond.io snapshot '+esc(SYNCED)+'</span></div>' +
-      '</header>' +
       '<div class="pz-wrap">' +
-        '<div class="pz-head"><h1>Personalized</h1><p>Respond.io「Main WA API」所有 WhatsApp 模板 — 搜索、筛选、展开阅读、一键复制。内容跟 Respond.io 一模一样。</p></div>' +
-        '<label class="pz-search"><span aria-hidden="true">🔍</span><input type="search" id="pz-q" placeholder="搜索模板名字 / 关键字 / 内容 — e.g. RM399, 反黑, call_busy" autocomplete="off"><button type="button" class="pz-clear" id="pz-clear" title="Clear" hidden>✕</button></label>' +
-        '<div class="pz-row"><span class="pz-row-label">Language</span>'+langChips+'</div>' +
-        '<div class="pz-row pz-cat-chips"><span class="pz-row-label">Category</span>'+catChips+'</div>' +
-        '<div class="pz-row pz-cat-select-row"><span class="pz-row-label">Category</span><select class="pz-select" id="pz-cat-select">'+catOpts+'</select></div>' +
-        '<div class="pz-toolbar"><span class="pz-result" id="pz-result"></span>' +
-          '<span style="display:flex;gap:6px;"><button type="button" class="btn btn-sm" data-pz-all="open">展开全部 Expand all</button><button type="button" class="btn btn-sm" data-pz-all="close">收起全部 Collapse all</button></span></div>' +
+        '<section class="pz-hero">' +
+          '<div class="pz-eyebrow">✍️ Respond.io · Main WA API</div>' +
+          '<h1>Personalized</h1>' +
+          '<p>找对的话，发对的人。搜索、选择类别、展开看全文，一键复制 WhatsApp 模板 — 内容跟 Respond.io 一模一样。</p>' +
+          '<div class="pz-stats">' +
+            '<div class="pz-stat"><b id="pz-stat-total">'+DATA.length+'</b><span>模板 Templates</span></div>' +
+            '<div class="pz-stat"><b>'+CATS.length+'</b><span>类别 Categories</span></div>' +
+            '<div class="pz-stat"><b>'+Object.keys(langs).length+'</b><span>语言 Languages</span></div>' +
+            '<div class="pz-stat"><b>'+esc(SYNCED)+'</b><span>同步日期 Snapshot</span></div>' +
+          '</div>' +
+          '<div class="pz-deco" aria-hidden="true"><i>Hi dear 你这几天有空吗？🥰</i><i>有哦！星期六可以吗？</i><i>我帮你安排医生空档 💛</i></div>' +
+        '</section>' +
+        '<div class="pz-filters">' +
+          '<div class="pz-frow">' +
+            '<label class="pz-search">'+ICON_SEARCH+'<input type="search" id="pz-q" placeholder="搜索名字、关键字或内容…  e.g. RM399、反黑、call_busy" autocomplete="off"><button type="button" class="pz-clear" id="pz-clear" title="Clear" hidden>✕</button></label>' +
+            '<div class="pz-selectbox"><span class="pz-sel-icon" id="pz-sel-icon">📚</span><select id="pz-cat-select" aria-label="Category"></select></div>' +
+          '</div>' +
+          '<div class="pz-frow">' +
+            '<div class="pz-seg" id="pz-lang">' + LANGS.map(function(l){ return '<button type="button" data-pz-lang="'+l[0]+'">'+esc(l[1])+' <span class="cnt" data-pz-cnt-lang="'+l[0]+'"></span></button>'; }).join("") + '</div>' +
+            '<div class="pz-seg pz-mode" id="pz-mode"><button type="button" data-pz-mode="csc">👤 CSC Mode</button><button type="button" data-pz-mode="admin">🛡️ Admin Mode</button></div>' +
+            '<span class="pz-spacer"></span>' +
+            '<span class="pz-result" id="pz-result"></span>' +
+            '<button type="button" class="pz-ghost" data-pz-all="open">展开全部</button>' +
+            '<button type="button" class="pz-ghost" data-pz-all="close">收起全部</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="pz-admin-bar" id="pz-admin-bar" hidden></div>' +
         '<div id="pz-results"></div>' +
+        '<div id="pz-modal"></div>' +
+        '<div class="pz-toast" id="pz-toast" hidden></div>' +
       '</div>';
   }
 
+  function bubbleHtml(o){
+    var h = '';
+    if(o.hm) h += '<div class="pz-bmedia">'+(MEDIA[o.hm]||o.hm)+'</div>';
+    var text = [o.h,o.b,o.f].filter(Boolean).join("\n\n");
+    return '<div class="pz-bubble">'+h+esc(text)+'</div>' +
+      (o.btn && o.btn.length ? '<div class="pz-bbtns">'+o.btn.map(function(b){ return '<span>'+esc(b)+'</span>'; }).join("")+'</div>' : '');
+  }
+
   function cardHtml(t){
+    var cat = CAT[t.c] || CAT.other;
     var open = !!S.open[t.id];
-    var tags = '<span class="tst-cat-tag">'+esc(CAT_LABEL[t.c]||t.c)+'</span><span class="tst-cat-tag pz-lang">'+esc(langLabel(t.lang))+'</span>';
-    if(t.st!=="approved") tags += '<span class="tst-cat-tag pz-warn">'+(t.st==="rejected"?"⚠️ Rejected 不能发":"⚠️ Disabled 已停用")+'</span>';
-    var body = '';
-    if(t.hm) body += '<p class="pz-note" style="margin:0 0 8px;">'+(MEDIA[t.hm]||t.hm)+' — 在 Respond.io 发送时会带这个附件</p>';
-    body += '<div class="pz-msg">'+esc([t.h,t.b,t.f].filter(Boolean).join("\n\n"))+'</div>';
-    if(t.btn && t.btn.length) body += '<div class="pz-btns">'+t.btn.map(function(b){ return '<span>🔘 '+esc(b)+'</span>'; }).join("")+'</div>';
-    (t.cards||[]).forEach(function(c, i){
-      body += '<div class="pz-cardslide"><div class="pz-cardslide-label">Carousel card '+(i+1)+(c.hm?' · '+(MEDIA[c.hm]||c.hm):'')+'</div>' +
-        (c.b?'<div class="pz-msg">'+esc(c.b)+'</div>':'') +
-        (c.btn&&c.btn.length?'<div class="pz-btns">'+c.btn.map(function(b){ return '<span>🔘 '+esc(b)+'</span>'; }).join("")+'</div>':'') + '</div>';
-    });
-    return '<div class="pz-card'+(open?' open':'')+'" data-pz-id="'+t.id+'">' +
-      '<div class="pz-card-head" data-pz-toggle="'+t.id+'">' +
-        '<span class="pz-caret">▶</span>' +
-        '<div class="pz-main"><div class="pz-name">'+esc(t.n)+'</div><div class="pz-preview">'+esc(t.copy.replace(/\s+/g," ").slice(0,140))+'</div><div class="pz-tags">'+tags+'</div></div>' +
-        '<button type="button" class="btn btn-sm btn-primary" data-pz-copy="'+t.id+'">📋 Copy</button>' +
+    var tags = '<span class="pz-tag cat">'+cat.emoji+' '+esc(cat.zh)+'</span><span class="pz-tag">'+esc(langLabel(t.lang))+'</span>';
+    if(t.hm || (t.cards && t.cards.length)) tags += '<span class="pz-tag media">'+(t.cards?'🎠 Carousel':(MEDIA[t.hm]||t.hm))+'</span>';
+    if(t.st!=="approved") tags += '<span class="pz-tag warn">'+(t.st==="rejected"?"⚠️ Rejected 不能发":"⚠️ Disabled 已停用")+'</span>';
+    var chat = '';
+    if(t.b || t.h) chat += bubbleHtml(t);
+    (t.cards||[]).forEach(function(c, i){ chat += '<div class="pz-clabel">Carousel card '+(i+1)+'</div>' + bubbleHtml(c); });
+    var note = (t.hm || t.cards) ? '<div class="pz-note">📎 这个模板带图片/视频，复制只会复制文字。要连附件一起发，请在 Respond.io 选这个模板。</div>' : '';
+    return '<article class="pz-card'+(open?' open':'')+'" style="--hue:'+cat.hue+'" data-pz-id="'+t.id+'">' +
+      '<div class="pz-head" data-pz-toggle="'+t.id+'">' +
+        '<div class="pz-ico">'+cat.emoji+'</div>' +
+        '<div class="pz-main"><div class="pz-name">'+esc(t.n)+'</div><div class="pz-preview">'+esc(t.copy.replace(/\s+/g," ").slice(0,180))+'</div><div class="pz-tags">'+tags+'</div></div>' +
+        '<div class="pz-side"><button type="button" class="pz-copy" data-pz-copy="'+t.id+'">'+ICON_COPY+'<span>Copy</span></button>' +
+          (S.mode==="admin" ? (isHidden(t)
+            ? '<button type="button" class="pz-adm restore" data-pz-restore="'+t.id+'">♻️ 恢复</button>'
+            : '<button type="button" class="pz-adm del" data-pz-del="'+t.id+'">🗑️ 删除</button>') : '') +
+          '<span class="pz-more">'+(open?'收起':'看全文')+' <i>⌄</i></span></div>' +
       '</div>' +
-      '<div class="pz-card-body">'+body+'</div>' +
-    '</div>';
+      '<div class="pz-body"><div class="pz-chat">'+chat+'</div>'+note+'</div>' +
+    '</article>';
   }
 
   function render(){
-    HOST.querySelectorAll("[data-pz-cat]").forEach(function(b){ b.classList.toggle("active", b.dataset.pzCat===S.cat); });
     HOST.querySelectorAll("[data-pz-lang]").forEach(function(b){ b.classList.toggle("active", b.dataset.pzLang===S.lang); });
-    var sel = document.getElementById("pz-cat-select"); if(sel) sel.value = S.cat;
-    // Counts reflect the other active filters, so a CSC sees where the matches are.
+    HOST.querySelectorAll("[data-pz-mode]").forEach(function(b){ b.classList.toggle("active", b.dataset.pzMode===S.mode); b.classList.toggle("admin-on", b.dataset.pzMode==="admin" && S.mode==="admin"); });
+    var hiddenCount = DATA.filter(isHidden).length;
+    document.getElementById("pz-stat-total").textContent = DATA.length - hiddenCount;
+    var bar = document.getElementById("pz-admin-bar");
+    bar.hidden = S.mode!=="admin";
+    if(S.mode==="admin"){
+      bar.innerHTML = '<span>🛡️ <b>Admin Mode</b> — 按 🗑️ 删除会从 dashboard 隐藏模板（全部 CSC 都看不到），<b>不会</b>删到 Respond.io。删错可以恢复。' +
+        (useDb ? '' : ' <em>（现在连不上数据库，只存在这台电脑）</em>') + '</span>' +
+        '<button type="button" class="pz-ghost" data-pz-showhidden="1">'+(S.showHidden ? '← 回到全部模板' : '🗑️ 已删除 ('+hiddenCount+')')+'</button>';
+    }
+    // Counts follow the other active filters, so a CSC sees where the matches are.
     var cc = {all:0}, lc = {all:0};
     DATA.forEach(function(t){
       if(matches(t, true, false)){ cc.all++; cc[t.c]=(cc[t.c]||0)+1; }
       if(matches(t, false, true)){ lc.all++; lc[t.lang]=(lc[t.lang]||0)+1; }
     });
-    HOST.querySelectorAll("[data-pz-cnt-cat]").forEach(function(s){ s.textContent = cc[s.dataset.pzCntCat]||0; });
     HOST.querySelectorAll("[data-pz-cnt-lang]").forEach(function(s){ s.textContent = lc[s.dataset.pzCntLang]||0; });
-    if(sel) Array.prototype.forEach.call(sel.options, function(o){ o.textContent = (o.value==="all"?"全部类别 All categories":CAT_LABEL[o.value]) + " (" + (cc[o.value]||0) + ")"; });
+    var sel = document.getElementById("pz-cat-select");
+    sel.innerHTML = '<option value="all">全部类别 All categories ('+cc.all+')</option>' +
+      CATS.map(function(c){ return '<option value="'+c[0]+'">'+c[1]+'  '+esc(c[2]+' · '+c[3])+' ('+(cc[c[0]]||0)+')</option>'; }).join("");
+    sel.value = S.cat;
+    document.getElementById("pz-sel-icon").textContent = S.cat==="all" ? "📚" : CAT[S.cat].emoji;
 
     var list = DATA.filter(function(t){ return matches(t); });
-    document.getElementById("pz-result").textContent = "显示 " + list.length + " / " + DATA.length + " 个模板";
+    document.getElementById("pz-result").innerHTML = "显示 <b>" + list.length + "</b> / " + (S.mode==="admin" && S.showHidden ? hiddenCount + " 已删除" : (DATA.length - hiddenCount));
     var out = document.getElementById("pz-results");
-    if(!list.length){ out.innerHTML = '<div class="empty-state"><h3>找不到模板</h3><div>换个关键字或筛选试试看。</div></div>'; return; }
+    if(!list.length){ out.innerHTML = S.mode==="admin" && S.showHidden
+      ? '<div class="pz-empty"><div>🧹</div><h3>没有已删除的模板</h3><div>在 Admin Mode 按 🗑️ 删除，模板会出现在这里，可以随时恢复。</div></div>'
+      : '<div class="pz-empty"><div>🫥</div><h3>找不到模板</h3><div>换个关键字、类别或语言试试看。</div></div>'; renderModal(); return; }
     var html = "";
     CATS.forEach(function(c){
       var items = list.filter(function(t){ return t.c===c[0]; });
       if(!items.length) return;
       items.sort(function(a,b){ return a.n<b.n?-1:a.n>b.n?1:(a.lang<b.lang?-1:1); });
-      html += '<section class="pz-group"><div class="pz-group-title"><h2>'+esc(c[1])+'</h2><span>'+items.length+'</span></div><div class="pz-list">'+items.map(cardHtml).join("")+'</div></section>';
+      html += '<section class="pz-group" style="--hue:'+c[4]+'">' +
+        '<div class="pz-ghead"><div class="pz-ico">'+c[1]+'</div><div><h2>'+esc(c[2])+'</h2><div class="pz-gsub">'+esc(c[3])+'</div></div><span class="pz-gcount">'+items.length+' 个</span></div>' +
+        '<div class="pz-grid">'+items.map(cardHtml).join("")+'</div></section>';
     });
     out.innerHTML = html;
+    renderModal();
+  }
+
+  function renderModal(){
+    var m = S.modal, host = document.getElementById("pz-modal");
+    if(!m){ host.innerHTML = ""; return; }
+    if(m.type==="login"){
+      host.innerHTML = '<div class="pz-overlay" data-pz-close="1"><div class="pz-dialog" role="dialog" aria-modal="true">' +
+        '<div class="pz-dicon">🛡️</div><h3>Admin Mode</h3><p>输入 Admin 密码才可以删除 / 恢复模板。</p>' +
+        '<input type="password" id="pz-pw" placeholder="Admin password" autocomplete="current-password">' +
+        (m.err ? '<div class="pz-derr">密码不对，再试一次</div>' : '') +
+        '<div class="pz-dbtns"><button type="button" class="pz-ghost" data-pz-close="1">取消</button><button type="button" class="pz-copy" data-pz-login="1"><span>解锁</span></button></div>' +
+      '</div></div>';
+      setTimeout(function(){ var i=document.getElementById("pz-pw"); if(i) i.focus(); }, 30);
+    } else if(m.type==="delete"){
+      var t = DATA[m.id];
+      host.innerHTML = '<div class="pz-overlay" data-pz-close="1"><div class="pz-dialog" role="dialog" aria-modal="true">' +
+        '<div class="pz-dicon">🗑️</div><h3>删除这个模板？</h3>' +
+        '<p><code>'+esc(t.n)+'</code> 会从 dashboard 隐藏，全部 CSC 都看不到。<br>Respond.io 里的模板不会被删。之后可以在「已删除」里恢复。</p>' +
+        '<div class="pz-dbtns"><button type="button" class="pz-ghost" data-pz-close="1">取消</button><button type="button" class="pz-copy danger" data-pz-confirm-del="'+t.id+'"><span>确定删除</span></button></div>' +
+      '</div></div>';
+    }
+  }
+
+  var toastTimer;
+  function toast(msg, isErr){
+    var el = document.getElementById("pz-toast"); if(!el) return;
+    el.textContent = msg; el.hidden = false; el.classList.toggle("err", !!isErr);
+    clearTimeout(toastTimer); toastTimer = setTimeout(function(){ el.hidden = true; }, 2600);
+  }
+
+  function setHidden(t, hide){
+    if(hide) HIDDEN[t.key] = { name: t.n, hiddenAt: Date.now() }; else delete HIDDEN[t.key];
+    saveLocalHidden(); render();
+    if(!useDb) return Promise.resolve();
+    var ref = db.collection("personalizedHidden").doc(t.key);
+    return (hide ? ref.set({ name: t.n, hiddenAt: Date.now() }) : ref.delete()).catch(function(e){
+      // Roll back so the screen never shows a change the team didn't get.
+      if(hide) delete HIDDEN[t.key]; else HIDDEN[t.key] = { name: t.n, hiddenAt: Date.now() };
+      saveLocalHidden(); render();
+      toast("保存失败，请再试一次", true);
+      throw e;
+    });
+  }
+
+  function tryLogin(){
+    var i = document.getElementById("pz-pw");
+    if(i && i.value === ADMIN_PASSWORD){
+      adminUnlocked = true;
+      try{ sessionStorage.setItem("csc_admin_unlocked", "1"); }catch(e){}
+      S.modal = null; S.mode = "admin"; render();
+    } else { S.modal = { type:"login", err:true }; renderModal(); }
   }
 
   function copyText(text, btn){
     function done(ok){
       if(!btn) return;
-      btn.textContent = ok ? "✓ Copied" : "Copy failed";
+      var label = btn.querySelector("span");
+      label.textContent = ok ? "Copied!" : "Copy failed";
       btn.classList.toggle("copied", ok);
-      setTimeout(function(){ btn.textContent = "📋 Copy"; btn.classList.remove("copied"); }, 1600);
+      setTimeout(function(){ label.textContent = "Copy"; btn.classList.remove("copied"); }, 1600);
     }
     function fallback(){
       var ta = document.createElement("textarea");
@@ -8432,7 +8666,30 @@ connect();
     } else fallback();
   }
 
+  function scrollToResults(){
+    var r = document.getElementById("pz-results"), f = HOST.querySelector(".pz-filters");
+    if(!r || !f) return;
+    var top = r.getBoundingClientRect().top + window.pageYOffset - (f.offsetHeight + 70);
+    if(window.pageYOffset > top) window.scrollTo({top: Math.max(0, top), behavior: "smooth"});
+  }
+
+  loadLocalHidden();
   shell(); render();
+
+  try{
+    if(typeof firebase !== "undefined" && typeof FIREBASE_CONFIG_FOLLOWUP !== "undefined"){
+      // Same named ("followup") Firebase app as Follow Up Hub / Testimonial — own collection only.
+      var fuApp = firebase.apps.some(function(a){ return a.name === "followup"; })
+        ? firebase.app("followup")
+        : firebase.initializeApp(FIREBASE_CONFIG_FOLLOWUP, "followup");
+      db = fuApp.firestore(); useDb = true;
+      db.collection("personalizedHidden").onSnapshot(function(snap){
+        var map = {};
+        snap.docs.forEach(function(d){ map[d.id] = d.data() || {}; });
+        HIDDEN = map; saveLocalHidden(); render();
+      }, function(err){ console.warn("personalizedHidden sync error", err); });
+    }
+  }catch(e){ console.warn("Personalized: Firebase unavailable, hides stay on this device", e); useDb = false; }
 
   var qTimer;
   HOST.addEventListener("input", function(e){
@@ -8442,8 +8699,12 @@ connect();
       qTimer = setTimeout(function(){ S.q = e.target.value.trim(); render(); }, 120);
     }
   });
+  HOST.addEventListener("keydown", function(e){
+    if(e.target.id==="pz-pw" && e.key==="Enter"){ e.preventDefault(); tryLogin(); }
+    else if(e.key==="Escape" && S.modal){ S.modal = null; renderModal(); }
+  });
   HOST.addEventListener("change", function(e){
-    if(e.target.id==="pz-cat-select"){ S.cat = e.target.value; render(); }
+    if(e.target.id==="pz-cat-select"){ S.cat = e.target.value; render(); scrollToResults(); }
   });
   HOST.addEventListener("click", function(e){
     var el;
@@ -8451,13 +8712,40 @@ connect();
       e.stopPropagation();
       var t = DATA[+el.dataset.pzCopy]; if(t) copyText(t.copy, el); return;
     }
+    if((el = e.target.closest("[data-pz-mode]"))){
+      var target = el.dataset.pzMode;
+      if(target==="admin" && !adminUnlocked){ S.modal = { type:"login" }; renderModal(); return; }
+      S.mode = target; if(target!=="admin") S.showHidden = false; render(); return;
+    }
+    if((el = e.target.closest("[data-pz-showhidden]"))){ S.showHidden = !S.showHidden; render(); return; }
+    if(e.target.closest("[data-pz-login]")){ tryLogin(); return; }
+    if((el = e.target.closest("[data-pz-confirm-del]"))){
+      var td = DATA[+el.dataset.pzConfirmDel]; S.modal = null;
+      if(td) setHidden(td, true).then(function(){ toast("已删除 " + td.n + "（可在「已删除」恢复）"); }, function(){});
+      renderModal(); return;
+    }
+    if(e.target.classList && e.target.classList.contains("pz-overlay") || e.target.closest("button[data-pz-close]")){ S.modal = null; renderModal(); return; }
+    if(e.target.closest(".pz-dialog")) return;
+    if((el = e.target.closest("[data-pz-del]"))){
+      e.stopPropagation(); if(S.mode!=="admin") return;
+      S.modal = { type:"delete", id:+el.dataset.pzDel }; renderModal(); return;
+    }
+    if((el = e.target.closest("[data-pz-restore]"))){
+      e.stopPropagation(); if(S.mode!=="admin") return;
+      var tr = DATA[+el.dataset.pzRestore];
+      if(tr) setHidden(tr, false).then(function(){ toast("已恢复 " + tr.n); }, function(){});
+      return;
+    }
     if((el = e.target.closest("[data-pz-toggle]"))){
       var id = +el.dataset.pzToggle;
       S.open[id] = !S.open[id];
-      var card = el.closest(".pz-card"); if(card) card.classList.toggle("open", !!S.open[id]);
+      var card = el.closest(".pz-card");
+      if(card){
+        card.classList.toggle("open", !!S.open[id]);
+        var more = card.querySelector(".pz-more"); if(more) more.firstChild.nodeValue = (S.open[id]?"收起":"看全文")+" ";
+      }
       return;
     }
-    if((el = e.target.closest("[data-pz-cat]"))){ S.cat = el.dataset.pzCat; render(); return; }
     if((el = e.target.closest("[data-pz-lang]"))){ S.lang = el.dataset.pzLang; render(); return; }
     if((el = e.target.closest("[data-pz-all]"))){
       var openAll = el.dataset.pzAll==="open";
