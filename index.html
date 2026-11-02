@@ -1022,6 +1022,41 @@ html[data-theme="dark"] #app-personalized{
 #app-personalized .pz-derr{color:#B3261E;font-size:12.5px;margin-top:8px;}
 #app-personalized .pz-dbtns{display:flex;gap:8px;justify-content:center;margin-top:16px;}
 #app-personalized .pz-dbtns > *{flex:1;justify-content:center;padding:10px 14px;font-size:13.5px;}
+#app-personalized .pz-adm-btns{display:flex;gap:6px;flex-wrap:wrap;}
+#app-personalized .pz-dialog.wide{max-width:720px;text-align:left;padding:22px 22px 18px;max-height:calc(100vh - 40px);display:flex;flex-direction:column;}
+#app-personalized .pz-dhead{margin-bottom:12px;}
+#app-personalized .pz-dhead p{margin:4px 0 0;}
+#app-personalized .pz-catlist{overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding:2px;margin:0 -2px;}
+#app-personalized .pz-catrow{
+    display:grid;grid-template-columns:52px 1fr 1fr 58px 40px;gap:8px;align-items:center;
+    padding:7px 8px;border-radius:12px;background:var(--surface-2);border-left:4px solid var(--hue);
+  }
+#app-personalized .pz-catrow input{
+    height:38px;width:100%;min-width:0;border-radius:9px;border:1.5px solid var(--border);background:var(--surface);
+    padding:0 10px;font-size:13.5px;color:var(--ink);outline:none;
+  }
+#app-personalized .pz-catrow input:focus{border-color:var(--accent);}
+#app-personalized .pz-catrow .pz-in-emoji{text-align:center;font-size:18px;padding:0 4px;}
+#app-personalized .pz-catcnt{font-size:12px;color:var(--ink-3);font-weight:600;text-align:right;white-space:nowrap;}
+#app-personalized .pz-catlock{text-align:center;font-size:15px;opacity:.6;cursor:help;}
+#app-personalized .pz-catrow .pz-adm{padding:6px 0;width:100%;}
+#app-personalized .pz-catrow.deleted{grid-template-columns:40px 1fr auto;opacity:.75;border-left-style:dashed;}
+#app-personalized .pz-catrow.deleted .pz-ico{width:34px;height:34px;font-size:16px;filter:grayscale(1);}
+#app-personalized .pz-catrow.deleted .pz-adm{width:auto;padding:5px 11px;}
+#app-personalized .pz-catdel-info{display:flex;flex-direction:column;min-width:0;}
+#app-personalized .pz-catdel-info b{font-size:13px;text-decoration:line-through;color:var(--ink-2);}
+#app-personalized .pz-catdel-info span{font-size:11.5px;color:var(--ink-3);}
+#app-personalized .pz-dsel{min-width:0;width:100%;text-align:left;}
+#app-personalized .pz-dsel select{padding-left:14px;}
+@media (max-width:720px){
+  #app-personalized .pz-catrow{grid-template-columns:46px 1fr 36px;grid-template-areas:"e zh d" "e en c";}
+  #app-personalized .pz-catrow .pz-in-emoji{grid-area:e;height:100%;}
+  #app-personalized .pz-catrow .pz-in-zh{grid-area:zh;}
+  #app-personalized .pz-catrow .pz-in-en{grid-area:en;}
+  #app-personalized .pz-catrow .pz-catcnt{grid-area:c;font-size:11px;}
+  #app-personalized .pz-catrow .pz-adm,#app-personalized .pz-catrow .pz-catlock{grid-area:d;}
+  #app-personalized .pz-catrow.deleted{grid-template-columns:36px 1fr auto;grid-template-areas:none;}
+}
 #app-personalized .pz-toast{
     position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:600;
     background:#172321;color:#fff;font-size:13px;font-weight:600;padding:10px 18px;border-radius:999px;
@@ -8433,7 +8468,32 @@ connect();
     ["aftercare","💚","护理后关心","After-Treatment Care","#16A34A"],
     ["other","🗂️","其他","Other","#64748B"]
   ];
-  var CAT = {}; CATS.forEach(function(c){ CAT[c[0]] = {emoji:c[1], zh:c[2], en:c[3], hue:c[4], label:c[2]+" · "+c[3]}; });
+  // Admin can rename / re-icon / delete categories; overrides live in Firestore (personalizedCategories).
+  var OVR = {};          // id -> {emoji, zh, en, deleted, moveTo}
+  var CAT = {}, ACTIVE = [];
+  function rebuildCats(){
+    CAT = {}; ACTIVE = [];
+    CATS.forEach(function(c){
+      var o = OVR[c[0]] || {};
+      var x = { id:c[0], emoji:o.emoji||c[1], zh:o.zh||c[2], en:(o.en!=null?o.en:c[3]), hue:c[4],
+                deleted: c[0]!=="other" && !!o.deleted, moveTo:o.moveTo||"other",
+                defEmoji:c[1], defZh:c[2], defEn:c[3] };
+      x.label = x.zh + (x.en ? " · " + x.en : "");
+      CAT[c[0]] = x;
+      if(!x.deleted) ACTIVE.push(x);
+    });
+    if(S.cat!=="all" && (!CAT[S.cat] || CAT[S.cat].deleted)) S.cat = "all";
+    DATA.forEach(function(t){
+      var cat = CAT[effCat(t)];
+      t.hay = (t.n + " " + t.copy + " " + cat.label + " " + t.lang).toLowerCase();
+    });
+  }
+  // A deleted category's templates follow its "moveTo" (chains resolved), ending at "other".
+  function effCat(t){
+    var id = t.c, guard = 0;
+    while(CAT[id] && CAT[id].deleted && guard++ < 30) id = CAT[id].moveTo;
+    return (CAT[id] && !CAT[id].deleted) ? id : "other";
+  }
   var LANGS = [["all","全部"],["Chinese","中文"],["English","English"],["Mixed","中英"],["Malay","Malay"]];
   var MEDIA = {image:"🖼️ 图片 Image", video:"🎬 视频 Video", document:"📄 文件 Document"};
   var ICON_COPY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
@@ -8448,8 +8508,6 @@ connect();
     if(t.f) parts.push(t.f);
     (t.cards || []).forEach(function(c){ if(c.b) parts.push(c.b); });
     t.copy = parts.join("\n\n");
-    var cat = CAT[t.c] || {};
-    t.hay = (t.n + " " + t.copy + " " + (cat.label||"") + " " + t.lang).toLowerCase();
   });
 
   // Stable per-template key: name + a hash of its text (names repeat across languages).
@@ -8473,7 +8531,7 @@ connect();
   function matches(t, ignoreCat, ignoreLang){
     if(S.mode==="admin" && S.showHidden){ if(!isHidden(t)) return false; }
     else if(isHidden(t)) return false;
-    if(!ignoreCat && S.cat!=="all" && t.c!==S.cat) return false;
+    if(!ignoreCat && S.cat!=="all" && effCat(t)!==S.cat) return false;
     if(!ignoreLang && S.lang!=="all" && t.lang!==S.lang) return false;
     if(S.q){
       var words = S.q.toLowerCase().split(/\s+/).filter(Boolean);
@@ -8492,7 +8550,7 @@ connect();
           '<p>找对的话，发对的人。搜索、选择类别、展开看全文，一键复制 WhatsApp 模板 — 内容跟 Respond.io 一模一样。</p>' +
           '<div class="pz-stats">' +
             '<div class="pz-stat"><b id="pz-stat-total">'+DATA.length+'</b><span>模板 Templates</span></div>' +
-            '<div class="pz-stat"><b>'+CATS.length+'</b><span>类别 Categories</span></div>' +
+            '<div class="pz-stat"><b id="pz-stat-cats">'+CATS.length+'</b><span>类别 Categories</span></div>' +
             '<div class="pz-stat"><b>'+Object.keys(langs).length+'</b><span>语言 Languages</span></div>' +
             '<div class="pz-stat"><b>'+esc(SYNCED)+'</b><span>同步日期 Snapshot</span></div>' +
           '</div>' +
@@ -8528,7 +8586,7 @@ connect();
   }
 
   function cardHtml(t){
-    var cat = CAT[t.c] || CAT.other;
+    var cat = CAT[effCat(t)];
     var open = !!S.open[t.id];
     var tags = '<span class="pz-tag cat">'+cat.emoji+' '+esc(cat.zh)+'</span><span class="pz-tag">'+esc(langLabel(t.lang))+'</span>';
     if(t.hm || (t.cards && t.cards.length)) tags += '<span class="pz-tag media">'+(t.cards?'🎠 Carousel':(MEDIA[t.hm]||t.hm))+'</span>';
@@ -8561,18 +8619,22 @@ connect();
     if(S.mode==="admin"){
       bar.innerHTML = '<span>🛡️ <b>Admin Mode</b> — 按 🗑️ 删除会从 dashboard 隐藏模板（全部 CSC 都看不到），<b>不会</b>删到 Respond.io。删错可以恢复。' +
         (useDb ? '' : ' <em>（现在连不上数据库，只存在这台电脑）</em>') + '</span>' +
-        '<button type="button" class="pz-ghost" data-pz-showhidden="1">'+(S.showHidden ? '← 回到全部模板' : '🗑️ 已删除 ('+hiddenCount+')')+'</button>';
+        '<span class="pz-adm-btns"><button type="button" class="pz-ghost" data-pz-managecats="1">✏️ 管理类别</button>' +
+        '<button type="button" class="pz-ghost" data-pz-showhidden="1">'+(S.showHidden ? '← 回到全部模板' : '🗑️ 已删除 ('+hiddenCount+')')+'</button></span>';
     }
     // Counts follow the other active filters, so a CSC sees where the matches are.
     var cc = {all:0}, lc = {all:0};
     DATA.forEach(function(t){
-      if(matches(t, true, false)){ cc.all++; cc[t.c]=(cc[t.c]||0)+1; }
+      if(matches(t, true, false)){ var ec = effCat(t); cc.all++; cc[ec]=(cc[ec]||0)+1; }
       if(matches(t, false, true)){ lc.all++; lc[t.lang]=(lc[t.lang]||0)+1; }
     });
     HOST.querySelectorAll("[data-pz-cnt-lang]").forEach(function(s){ s.textContent = lc[s.dataset.pzCntLang]||0; });
+    var total = {}; DATA.forEach(function(t){ if(!isHidden(t)){ var ec = effCat(t); total[ec]=(total[ec]||0)+1; } });
+    var shownCats = ACTIVE.filter(function(c){ return S.mode==="admin" || total[c.id] || c.id===S.cat; });
+    document.getElementById("pz-stat-cats").textContent = ACTIVE.filter(function(c){ return total[c.id]; }).length;
     var sel = document.getElementById("pz-cat-select");
     sel.innerHTML = '<option value="all">全部类别 All categories ('+cc.all+')</option>' +
-      CATS.map(function(c){ return '<option value="'+c[0]+'">'+c[1]+'  '+esc(c[2]+' · '+c[3])+' ('+(cc[c[0]]||0)+')</option>'; }).join("");
+      shownCats.map(function(c){ return '<option value="'+c.id+'">'+c.emoji+'  '+esc(c.label)+' ('+(cc[c.id]||0)+')</option>'; }).join("");
     sel.value = S.cat;
     document.getElementById("pz-sel-icon").textContent = S.cat==="all" ? "📚" : CAT[S.cat].emoji;
 
@@ -8583,21 +8645,72 @@ connect();
       ? '<div class="pz-empty"><div>🧹</div><h3>没有已删除的模板</h3><div>在 Admin Mode 按 🗑️ 删除，模板会出现在这里，可以随时恢复。</div></div>'
       : '<div class="pz-empty"><div>🫥</div><h3>找不到模板</h3><div>换个关键字、类别或语言试试看。</div></div>'; renderModal(); return; }
     var html = "";
-    CATS.forEach(function(c){
-      var items = list.filter(function(t){ return t.c===c[0]; });
+    ACTIVE.forEach(function(c){
+      var items = list.filter(function(t){ return effCat(t)===c.id; });
       if(!items.length) return;
       items.sort(function(a,b){ return a.n<b.n?-1:a.n>b.n?1:(a.lang<b.lang?-1:1); });
-      html += '<section class="pz-group" style="--hue:'+c[4]+'">' +
-        '<div class="pz-ghead"><div class="pz-ico">'+c[1]+'</div><div><h2>'+esc(c[2])+'</h2><div class="pz-gsub">'+esc(c[3])+'</div></div><span class="pz-gcount">'+items.length+' 个</span></div>' +
+      html += '<section class="pz-group" style="--hue:'+c.hue+'">' +
+        '<div class="pz-ghead"><div class="pz-ico">'+c.emoji+'</div><div><h2>'+esc(c.zh)+'</h2><div class="pz-gsub">'+esc(c.en)+'</div></div><span class="pz-gcount">'+items.length+' 个</span></div>' +
         '<div class="pz-grid">'+items.map(cardHtml).join("")+'</div></section>';
     });
     out.innerHTML = html;
     renderModal();
   }
 
+  // Keep what the admin is typing if a live update re-renders the panel.
+  function syncCatDraft(){
+    var m = S.modal; if(!m || m.type!=="cats") return;
+    HOST.querySelectorAll("[data-pz-catrow]").forEach(function(r){
+      var id = r.dataset.pzCatrow;
+      m.draft[id] = { emoji: r.querySelector(".pz-in-emoji").value, zh: r.querySelector(".pz-in-zh").value, en: r.querySelector(".pz-in-en").value };
+    });
+  }
+  function catCounts(){
+    var n = {}; DATA.forEach(function(t){ if(!isHidden(t)){ var ec = effCat(t); n[ec]=(n[ec]||0)+1; } }); return n;
+  }
+
   function renderModal(){
     var m = S.modal, host = document.getElementById("pz-modal");
     if(!m){ host.innerHTML = ""; return; }
+    if(m.type==="cats"){
+      syncCatDraft();
+      var n = catCounts();
+      var rows = CATS.map(function(c){
+        var x = CAT[c[0]], d = m.draft[x.id] || {emoji:x.emoji, zh:x.zh, en:x.en};
+        if(x.deleted){
+          return '<div class="pz-catrow deleted" style="--hue:'+x.hue+'"><div class="pz-ico">'+x.emoji+'</div>' +
+            '<div class="pz-catdel-info"><b>'+esc(x.label)+'</b><span>已删除 · 模板搬去「'+esc(CAT[effCat({c:x.id})].zh)+'」</span></div>' +
+            '<button type="button" class="pz-adm restore" data-pz-catrestore="'+x.id+'">♻️ 恢复</button></div>';
+        }
+        return '<div class="pz-catrow" data-pz-catrow="'+x.id+'" style="--hue:'+x.hue+'">' +
+          '<input class="pz-in-emoji" value="'+esc(d.emoji)+'" maxlength="8" aria-label="Icon">' +
+          '<input class="pz-in-zh" value="'+esc(d.zh)+'" placeholder="中文名字" aria-label="中文名字">' +
+          '<input class="pz-in-en" value="'+esc(d.en)+'" placeholder="English name" aria-label="English name">' +
+          '<span class="pz-catcnt">'+(n[x.id]||0)+' 个</span>' +
+          (x.id==="other" ? '<span class="pz-catlock" title="其他是默认类别，被删除类别的模板会搬来这里">🔒</span>'
+                          : '<button type="button" class="pz-adm del" data-pz-catdel="'+x.id+'" title="删除类别">🗑️</button>') +
+        '</div>';
+      }).join("");
+      host.innerHTML = '<div class="pz-overlay" data-pz-close="1"><div class="pz-dialog wide" role="dialog" aria-modal="true">' +
+        '<div class="pz-dhead"><h3>✏️ 管理类别</h3><p>改图标、中文名、英文名，再按「保存」。删除类别时，里面的模板会搬去别的类别，不会消失。</p></div>' +
+        '<div class="pz-catlist">'+rows+'</div>' +
+        '<div class="pz-dbtns"><button type="button" class="pz-ghost" data-pz-close="1">取消</button><button type="button" class="pz-copy" data-pz-catsave="1"><span>保存修改</span></button></div>' +
+      '</div></div>';
+      return;
+    }
+    if(m.type==="catdel"){
+      var x = CAT[m.id], cnt = catCounts()[m.id] || 0;
+      var opts = ACTIVE.filter(function(c){ return c.id!==m.id; }).map(function(c){
+        return '<option value="'+c.id+'"'+(c.id==="other"?' selected':'')+'>'+c.emoji+'  '+esc(c.label)+'</option>'; }).join("");
+      host.innerHTML = '<div class="pz-overlay" data-pz-close="1"><div class="pz-dialog" role="dialog" aria-modal="true">' +
+        '<div class="pz-dicon">'+x.emoji+'</div><h3>删除「'+esc(x.zh)+'」？</h3>' +
+        '<p>这个类别里的 <b>'+cnt+'</b> 个模板会搬去：</p>' +
+        '<div class="pz-selectbox pz-dsel"><select id="pz-catmove">'+opts+'</select></div>' +
+        '<p style="margin-top:12px;">模板不会被删除。之后可以在「管理类别」恢复这个类别。</p>' +
+        '<div class="pz-dbtns"><button type="button" class="pz-ghost" data-pz-backcats="1">返回</button><button type="button" class="pz-copy danger" data-pz-catdelok="'+x.id+'"><span>确定删除类别</span></button></div>' +
+      '</div></div>';
+      return;
+    }
     if(m.type==="login"){
       host.innerHTML = '<div class="pz-overlay" data-pz-close="1"><div class="pz-dialog" role="dialog" aria-modal="true">' +
         '<div class="pz-dicon">🛡️</div><h3>Admin Mode</h3><p>输入 Admin 密码才可以删除 / 恢复模板。</p>' +
@@ -8632,6 +8745,22 @@ connect();
       // Roll back so the screen never shows a change the team didn't get.
       if(hide) delete HIDDEN[t.key]; else HIDDEN[t.key] = { name: t.n, hiddenAt: Date.now() };
       saveLocalHidden(); render();
+      toast("保存失败，请再试一次", true);
+      throw e;
+    });
+  }
+
+  var CAT_LOCAL_KEY = "pz_cats_local";
+  function loadLocalCats(){ try{ OVR = JSON.parse(localStorage.getItem(CAT_LOCAL_KEY) || "{}") || {}; }catch(e){ OVR = {}; } }
+  function saveLocalCats(){ try{ localStorage.setItem(CAT_LOCAL_KEY, JSON.stringify(OVR)); }catch(e){} }
+  function saveCatPatch(id, patch){
+    var before = OVR[id] ? JSON.parse(JSON.stringify(OVR[id])) : null;
+    OVR[id] = Object.assign({}, OVR[id] || {}, patch);
+    saveLocalCats(); rebuildCats(); render();
+    if(!useDb) return Promise.resolve();
+    return db.collection("personalizedCategories").doc(id).set(patch, { merge: true }).catch(function(e){
+      if(before) OVR[id] = before; else delete OVR[id];
+      saveLocalCats(); rebuildCats(); render();
       toast("保存失败，请再试一次", true);
       throw e;
     });
@@ -8673,7 +8802,7 @@ connect();
     if(window.pageYOffset > top) window.scrollTo({top: Math.max(0, top), behavior: "smooth"});
   }
 
-  loadLocalHidden();
+  loadLocalHidden(); loadLocalCats(); rebuildCats();
   shell(); render();
 
   try{
@@ -8688,6 +8817,11 @@ connect();
         snap.docs.forEach(function(d){ map[d.id] = d.data() || {}; });
         HIDDEN = map; saveLocalHidden(); render();
       }, function(err){ console.warn("personalizedHidden sync error", err); });
+      db.collection("personalizedCategories").onSnapshot(function(snap){
+        var map = {};
+        snap.docs.forEach(function(d){ map[d.id] = d.data() || {}; });
+        OVR = map; saveLocalCats(); rebuildCats(); render();
+      }, function(err){ console.warn("personalizedCategories sync error", err); });
     }
   }catch(e){ console.warn("Personalized: Firebase unavailable, hides stay on this device", e); useDb = false; }
 
@@ -8719,6 +8853,37 @@ connect();
     }
     if((el = e.target.closest("[data-pz-showhidden]"))){ S.showHidden = !S.showHidden; render(); return; }
     if(e.target.closest("[data-pz-login]")){ tryLogin(); return; }
+    if(e.target.closest("[data-pz-managecats]")){ if(S.mode!=="admin") return; S.modal = { type:"cats", draft:{} }; renderModal(); return; }
+    if(e.target.closest("[data-pz-catsave]")){
+      syncCatDraft();
+      var draft = S.modal.draft, jobs = [], bad = false;
+      Object.keys(draft).forEach(function(id){
+        var x = CAT[id], d = draft[id];
+        var zh = d.zh.trim(), en = d.en.trim(), emoji = d.emoji.trim() || x.defEmoji;
+        if(!zh){ bad = true; return; }
+        if(zh!==x.zh || en!==x.en || emoji!==x.emoji) jobs.push(saveCatPatch(id, { zh:zh, en:en, emoji:emoji }));
+      });
+      if(bad){ toast("中文名字不能空白", true); return; }
+      S.modal = null; renderModal();
+      if(!jobs.length){ toast("没有改动"); return; }
+      Promise.all(jobs).then(function(){ toast("类别已更新 ✓"); }, function(){});
+      return;
+    }
+    if((el = e.target.closest("[data-pz-catdel]"))){ syncCatDraft(); S.modal = { type:"catdel", id:el.dataset.pzCatdel, draft:S.modal.draft }; renderModal(); return; }
+    if(e.target.closest("[data-pz-backcats]")){ S.modal = { type:"cats", draft:(S.modal && S.modal.draft) || {} }; renderModal(); return; }
+    if((el = e.target.closest("[data-pz-catdelok]"))){
+      var cid = el.dataset.pzCatdelok, mv = document.getElementById("pz-catmove");
+      var moveTo = mv ? mv.value : "other", nm = CAT[cid].zh, back = (S.modal && S.modal.draft) || {};
+      delete back[cid];
+      S.modal = { type:"cats", draft:back };
+      saveCatPatch(cid, { deleted:true, moveTo:moveTo }).then(function(){ toast("已删除类别「"+nm+"」"); }, function(){});
+      renderModal(); return;
+    }
+    if((el = e.target.closest("[data-pz-catrestore]"))){
+      var rid = el.dataset.pzCatrestore;
+      saveCatPatch(rid, { deleted:false }).then(function(){ toast("已恢复类别「"+CAT[rid].zh+"」"); }, function(){});
+      return;
+    }
     if((el = e.target.closest("[data-pz-confirm-del]"))){
       var td = DATA[+el.dataset.pzConfirmDel]; S.modal = null;
       if(td) setHidden(td, true).then(function(){ toast("已删除 " + td.n + "（可在「已删除」恢复）"); }, function(){});
